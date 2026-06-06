@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Automation</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#e1e4e8;min-height:100vh}
+        .header{background:linear-gradient(135deg,#1a1d29,#252836);border-bottom:1px solid #2d3148;padding:20px 40px;display:flex;justify-content:space-between;align-items:center}
+        .header h1{font-size:24px;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .header-actions{display:flex;gap:12px;align-items:center}
+        .stats{display:flex;gap:20px;padding:20px 40px;background:#161822}
+        .stat{background:#1e2030;border:1px solid #2d3148;border-radius:12px;padding:16px 24px;flex:1}
+        .stat .label{font-size:12px;color:#8b8fa3;text-transform:uppercase;letter-spacing:1px}
+        .stat .value{font-size:28px;font-weight:700;margin-top:4px}
+        .green{color:#34d399}.orange{color:#fbbf24}.blue{color:#60a5fa}
+        .btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+        .btn:hover{transform:translateY(-1px);opacity:.9}
+        .btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+        .btn-success{background:#059669;color:#fff}
+        .btn-danger{background:#dc2626;color:#fff}
+        .btn-outline{background:transparent;border:1px solid #2d3148;color:#8b8fa3}
+        .btn-sm{padding:6px 14px;font-size:12px}
+        .badge{padding:6px 16px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:1px}
+        .badge-auto{background:#059669;color:#fff}
+        .badge-manual{background:#d97706;color:#fff}
+        .main{padding:30px 40px}
+        .section{margin-bottom:40px}
+        .section-title{font-size:18px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+        .count{background:#667eea;color:#fff;padding:2px 10px;border-radius:12px;font-size:12px}
+        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:20px}
+        .card{background:#1e2030;border:1px solid #2d3148;border-radius:12px;overflow:hidden;transition:border-color .2s}
+        .card:hover{border-color:#667eea}
+        .card img{width:100%;height:200px;object-fit:cover;background:#252836}
+        .card-body{padding:20px}
+        .card-title{font-size:16px;font-weight:600;margin-bottom:8px;line-height:1.4}
+        .card-text{font-size:13px;color:#8b8fa3;line-height:1.6;margin-bottom:10px}
+        .card-tags{font-size:12px;color:#667eea;margin-bottom:12px}
+        .card-meta{font-size:11px;color:#5a5f7a;margin-bottom:12px}
+        .card-actions{display:flex;gap:8px}
+        table{width:100%;border-collapse:collapse}
+        th{text-align:left;padding:12px 16px;font-size:12px;color:#8b8fa3;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #2d3148}
+        td{padding:14px 16px;font-size:14px;border-bottom:1px solid #1a1d29}
+        .status{padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600}
+        .s-posted{background:#064e3b;color:#34d399}
+        .s-pending{background:#78350f;color:#fbbf24}
+        .s-failed{background:#7f1d1d;color:#f87171}
+        .s-rejected{background:#1e1e1e;color:#8b8fa3}
+        .empty{text-align:center;padding:60px 20px;color:#5a5f7a}
+        .empty .icon{font-size:48px;margin-bottom:12px}
+        form.inline{display:inline}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Content Automation</h1>
+        <div class="header-actions">
+            <span class="badge {{ 'badge-auto' if mode == 'AUTO' else 'badge-manual' }}">{{ mode }} MODE</span>
+            <form action="/toggle" method="post" class="inline"><button class="btn btn-outline btn-sm">Switch Mode</button></form>
+            <form action="/trigger" method="post" class="inline"><button class="btn btn-primary">Fetch News</button></form>
+        </div>
+    </div>
+
+    <div class="stats">
+        <div class="stat"><div class="label">Pending Review</div><div class="value orange">{{ total_pending }}</div></div>
+        <div class="stat"><div class="label">Posted Today</div><div class="value green">{{ posts_today }}</div></div>
+        <div class="stat"><div class="label">Mode</div><div class="value blue">{{ mode }}</div></div>
+    </div>
+
+    <div class="main">
+        <div class="section">
+            <div class="section-title">Pending Articles {% if total_pending %}<span class="count">{{ total_pending }}</span>{% endif %}</div>
+            {% if pending %}
+            <div class="grid">
+                {% for a in pending %}
+                <div class="card">
+                    {% if a.image_path %}<img src="/images/{{ a.image_path.split('\\')[-1].split('/')[-1] }}" onerror="this.style.display='none'">{% endif %}
+                    <div class="card-body">
+                        <div class="card-title">#{{ a.id }}: {{ a.generated_title }}</div>
+                        <div class="card-text">{{ a.short_text[:200] }}{% if a.short_text|length > 200 %}...{% endif %}</div>
+                        <div class="card-tags">{{ a.hashtags }}</div>
+                        <div class="card-meta">Source: {{ a.source_title[:60] }} | {{ a.created_at[:16] }}</div>
+                        <div class="card-actions">
+                            <form action="/approve/{{ a.id }}" method="post" class="inline"><button class="btn btn-success btn-sm">Approve & Post</button></form>
+                            <form action="/reject/{{ a.id }}" method="post" class="inline"><button class="btn btn-danger btn-sm">Reject</button></form>
+                            <a href="/article/{{ a.id }}" class="btn btn-outline btn-sm">View Full</a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty"><div class="icon">📰</div><p>No pending articles. Click <strong>Fetch News</strong> to get started.</p></div>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <div class="section-title">Posting History</div>
+            {% if history %}
+            <table>
+                <thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Platforms</th><th>Date</th></tr></thead>
+                <tbody>
+                {% for h in history %}
+                <tr>
+                    <td>#{{ h.id }}</td>
+                    <td>{{ h.generated_title[:50] }}{% if h.generated_title|length > 50 %}...{% endif %}</td>
+                    <td><span class="status s-{{ h.status }}">{{ h.status }}</span></td>
+                    <td>{{ h.platforms or '-' }}</td>
+                    <td>{{ h.created_at[:16] }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty"><div class="icon">📊</div><p>No posting history yet.</p></div>
+            {% endif %}
+        </div>
+    </div>
+    <script>setTimeout(()=>location.reload(),30000)</script>
+</body>
+</html>
