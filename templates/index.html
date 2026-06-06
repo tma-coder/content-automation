@@ -37,7 +37,9 @@
         .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:20px}
         .card{background:#1e2030;border:1px solid #2d3148;border-radius:12px;overflow:hidden;transition:border-color .2s}
         .card:hover{border-color:#667eea}
-        .card-img{width:100%;height:200px;object-fit:cover;background:#252836;display:block}
+        .card-img{width:100%;height:200px;object-fit:cover;background:#252836;display:block;opacity:0;transition:opacity .3s}
+        .img-wrap{min-height:200px;background:#252836}
+        .img-loading{height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#252836}
         .card-body{padding:20px}
         .card-title{font-size:16px;font-weight:600;margin-bottom:8px;line-height:1.4}
         .card-text{font-size:13px;color:#8b8fa3;line-height:1.6;margin-bottom:10px}
@@ -100,9 +102,18 @@
             <div class="grid">
                 {% for a in pending %}
                 <div class="card">
-                    <div style="position:relative">
-                        {% if a.image_url %}<img class="card-img" src="{{ a.image_url }}" onerror="this.parentElement.innerHTML='<div style=\'height:200px;background:#252836;display:flex;align-items:center;justify-content:center;color:#5a5f7a\'>Image loading...</div>'" loading="lazy">{% endif %}
-                        <form action="/regenerate-image/{{ a.id }}" method="post" class="inline" style="position:absolute;top:8px;right:8px"><button class="btn btn-sm" style="background:rgba(0,0,0,.7);color:#fff;font-size:11px" title="Regenerate image">🔄 New Image</button></form>
+                    <div style="position:relative" class="img-wrap">
+                        {% if a.image_url %}
+                        <div class="img-loading" id="imgload-{{ a.id }}"><div class="spinner" style="width:24px;height:24px;border-width:3px"></div><span style="font-size:12px;color:#8b8fa3;margin-top:8px">Generating image...</span></div>
+                        <img class="card-img" src="{{ a.image_url }}" loading="lazy"
+                            onload="document.getElementById('imgload-{{ a.id }}').style.display='none';this.style.opacity=1"
+                            onerror="document.getElementById('imgload-{{ a.id }}').innerHTML='<span style=color:#5a5f7a>⚠️ Image unavailable</span>'">
+                        {% else %}
+                        <div class="img-loading"><span style="color:#5a5f7a">No image</span></div>
+                        {% endif %}
+                        <div style="position:absolute;top:8px;right:8px;display:flex;gap:4px">
+                            <form action="/regenerate-image/{{ a.id }}" method="post" class="inline"><button class="btn btn-sm" style="background:rgba(0,0,0,.7);color:#fff;font-size:11px">🔄 New Image</button></form>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="card-title">#{{ a.id }}: {{ a.generated_title }}</div>
