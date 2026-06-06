@@ -100,15 +100,18 @@
             <div class="grid">
                 {% for a in pending %}
                 <div class="card">
-                    {% if a.image_url %}<img class="card-img" src="{{ a.image_url }}" onerror="this.style.display='none'" loading="lazy">{% endif %}
+                    <div style="position:relative">
+                        {% if a.image_url %}<img class="card-img" src="{{ a.image_url }}" onerror="this.parentElement.innerHTML='<div style=\'height:200px;background:#252836;display:flex;align-items:center;justify-content:center;color:#5a5f7a\'>Image loading...</div>'" loading="lazy">{% endif %}
+                        <form action="/regenerate-image/{{ a.id }}" method="post" class="inline" style="position:absolute;top:8px;right:8px"><button class="btn btn-sm" style="background:rgba(0,0,0,.7);color:#fff;font-size:11px" title="Regenerate image">🔄 New Image</button></form>
+                    </div>
                     <div class="card-body">
                         <div class="card-title">#{{ a.id }}: {{ a.generated_title }}</div>
                         <div class="card-text">{{ a.short_text[:200] }}{% if a.short_text|length > 200 %}...{% endif %}</div>
                         <div class="card-tags">{{ a.hashtags }}</div>
                         <div class="card-meta">
-                            <span>Source: {{ a.source_title[:60] }}</span>
-                            {% if a.published_at %}<span>Published: {{ a.published_at }}</span>{% endif %}
-                            <span>Fetched: {{ a.created_at[:19] }}</span>
+                            <span>📰 {{ a.source_title[:60] }}</span>
+                            {% if a.published_at %}<span>📅 Published: {{ a.published_at }}</span>{% endif %}
+                            <span>⏰ Fetched: {{ a.created_at[:19] }}</span>
                         </div>
                         <div class="card-actions">
                             <form action="/approve/{{ a.id }}" method="post" class="inline" onsubmit="showLoading()"><button class="btn btn-success btn-sm">Approve & Post</button></form>

@@ -56,6 +56,10 @@ def update_article_status(article_id, status):
     get_client().table("articles").update(data).eq("id", article_id).execute()
 
 
+def update_image(article_id, image_url):
+    get_client().table("articles").update({"image_url": image_url}).eq("id", article_id).execute()
+
+
 def log_post(article_id, platform, success, post_id="", error_message=""):
     get_client().table("post_log").insert({
         "article_id": article_id,

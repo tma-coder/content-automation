@@ -69,6 +69,20 @@ async def reject(article_id: int):
     return RedirectResponse(url="/", status_code=303)
 
 
+@app.post("/regenerate-image/{article_id}")
+async def regenerate_image_route(article_id: int):
+    try:
+        import db
+        from core.image_generator import regenerate_image
+        article = db.get_article(article_id)
+        if article:
+            new_url = regenerate_image(article["generated_title"])
+            db.update_image(article_id, new_url)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    return RedirectResponse(url="/", status_code=303)
+
+
 @app.get("/article/{article_id}", response_class=HTMLResponse)
 async def view_article(request: Request, article_id: int):
     try:
