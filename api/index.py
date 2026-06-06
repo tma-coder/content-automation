@@ -131,7 +131,7 @@ async def diagnose():
         from openai import OpenAI
         client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=config.OPENROUTER_API_KEY)
         resp = client.chat.completions.create(
-            model="google/gemini-2.0-flash-exp:free",
+            model="google/gemini-3.5-flash:free",
             messages=[{"role": "user", "content": "Say hello in 5 words"}],
             max_tokens=20,
         )

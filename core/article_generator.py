@@ -41,7 +41,7 @@ Source: {news_link}
 Write original content. Return valid JSON only."""
 
     response = client.chat.completions.create(
-        model="google/gemini-2.0-flash-exp:free",
+        model="google/gemini-3.5-flash:free",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
