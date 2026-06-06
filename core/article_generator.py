@@ -1,12 +1,12 @@
 import json
 import logging
+import re
 from dataclasses import dataclass
 from openai import OpenAI
 import config
 
 logger = logging.getLogger(__name__)
 
-# Free models on OpenRouter - tries in order, falls back to next if one fails
 FREE_MODELS = [
     "google/gemini-3.5-flash:free",
     "google/gemma-4-31b-it:free",
@@ -30,7 +30,8 @@ class GeneratedArticle:
 SYSTEM_PROMPT = """You are a professional social media content writer. Given a news story,
 create engaging, original content. Do NOT copy the source.
 
-Respond with valid JSON only, no markdown fences:
+You MUST respond with ONLY valid JSON, no markdown, no explanation, no fences.
+Format:
 {
     "title": "Catchy headline (max 100 chars)",
     "short_text": "Concise post (max 280 chars). Include a call to action.",
@@ -39,7 +40,45 @@ Respond with valid JSON only, no markdown fences:
 }"""
 
 
+def _extract_json(text):
+    """Robustly extract JSON object from text that may have extra content."""
+    if not text:
+        return None
+
+    text = text.strip()
+
+    # Remove markdown code fences
+    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*```\s*$", "", text)
+
+    # Try direct parse first
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Find the first { and last } to extract just the JSON
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+
+    candidate = text[start:end + 1]
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        # Try to fix common issues: trailing commas, single quotes
+        candidate = re.sub(r",(\s*[}\]])", r"\1", candidate)
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            return None
+
+
 def generate_article(news_title, news_summary, news_link):
+    if not config.OPENROUTER_API_KEY:
+        raise RuntimeError("OPENROUTER_API_KEY not set")
+
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=config.OPENROUTER_API_KEY,
@@ -50,7 +89,7 @@ Title: {news_title}
 Summary: {news_summary}
 Source: {news_link}
 
-Write original content. Return valid JSON only."""
+Write original content. Return ONLY valid JSON, nothing else."""
 
     last_error = None
 
@@ -67,18 +106,36 @@ Write original content. Return valid JSON only."""
                 max_tokens=1500,
             )
 
-            text = response.choices[0].message.content.strip()
-            if text.startswith("```"):
-                lines = [l for l in text.split("\n") if not l.strip().startswith("```")]
-                text = "\n".join(lines)
+            if not response.choices:
+                logger.warning(f"{model}: empty choices")
+                continue
 
-            data = json.loads(text)
+            content = response.choices[0].message.content
+            if not content:
+                logger.warning(f"{model}: empty content")
+                continue
+
+            data = _extract_json(content)
+            if not data:
+                logger.warning(f"{model}: could not extract JSON from response")
+                continue
+
+            # Validate required fields
+            title = data.get("title") or news_title
+            short_text = data.get("short_text") or ""
+            long_text = data.get("long_text") or ""
+            hashtags = data.get("hashtags") or ""
+
+            if not short_text and not long_text:
+                logger.warning(f"{model}: missing both short_text and long_text")
+                continue
+
             logger.info(f"Article generated successfully with: {model}")
             return GeneratedArticle(
-                title=data.get("title", news_title),
-                short_text=data.get("short_text", ""),
-                long_text=data.get("long_text", ""),
-                hashtags=data.get("hashtags", ""),
+                title=str(title)[:200],
+                short_text=str(short_text)[:500],
+                long_text=str(long_text)[:3000],
+                hashtags=str(hashtags)[:500],
             )
 
         except Exception as e:

@@ -57,6 +57,8 @@
         .s-posted{background:#064e3b;color:#34d399}
         .s-pending{background:#78350f;color:#fbbf24}
         .s-failed{background:#7f1d1d;color:#f87171}
+        .s-rejected{background:#1e1e1e;color:#8b8fa3}
+        .s-approved{background:#064e3b;color:#34d399}
         .empty{text-align:center;padding:40px 20px;color:#5a5f7a;font-size:13px}
         form.inline{display:inline}
         .spinner{width:20px;height:20px;border:3px solid #2d3148;border-top:3px solid #667eea;border-radius:50%;animation:spin .8s linear infinite}
@@ -79,14 +81,14 @@
             <button class="btn btn-primary" type="submit">Fetch News</button>
         </form>
         <div class="quick-topics">
-            <button class="qt" onclick="setTopic('AI')">AI</button>
-            <button class="qt" onclick="setTopic('cryptocurrency')">Crypto</button>
-            <button class="qt" onclick="setTopic('technology')">Tech</button>
-            <button class="qt" onclick="setTopic('business')">Business</button>
-            <button class="qt" onclick="setTopic('science')">Science</button>
-            <button class="qt" onclick="setTopic('sports')">Sports</button>
-            <button class="qt" onclick="setTopic('health')">Health</button>
-            <button class="qt" onclick="setTopic('world news')">World</button>
+            <button type="button" class="qt" onclick="setTopic('AI')">AI</button>
+            <button type="button" class="qt" onclick="setTopic('cryptocurrency')">Crypto</button>
+            <button type="button" class="qt" onclick="setTopic('technology')">Tech</button>
+            <button type="button" class="qt" onclick="setTopic('business')">Business</button>
+            <button type="button" class="qt" onclick="setTopic('science')">Science</button>
+            <button type="button" class="qt" onclick="setTopic('sports')">Sports</button>
+            <button type="button" class="qt" onclick="setTopic('health')">Health</button>
+            <button type="button" class="qt" onclick="setTopic('world news')">World</button>
         </div>
     </div>
     <div class="stats">
