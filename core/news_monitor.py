@@ -19,11 +19,10 @@ class NewsItem:
 
 def fetch_news(topic, max_items=3):
     url = GOOGLE_NEWS_RSS.format(query=topic.replace(" ", "+"))
-    logger.info(f"Fetching news for: {topic}")
     try:
         feed = feedparser.parse(url)
     except Exception as e:
-        logger.error(f"RSS fetch failed for '{topic}': {e}")
+        logger.error(f"RSS fetch failed: {e}")
         return []
 
     items = []
@@ -34,8 +33,6 @@ def fetch_news(topic, max_items=3):
         if not link or not title or db.article_exists(link):
             continue
         items.append(NewsItem(title=title, link=link, summary=summary, published=entry.get("published", "")))
-
-    logger.info(f"Found {len(items)} new articles for: {topic}")
     return items
 
 

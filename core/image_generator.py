@@ -1,23 +1,20 @@
-import os
 import base64
 import logging
 from datetime import datetime
 from google import genai
 from google.genai import types
 import config
+import db
 
 logger = logging.getLogger(__name__)
 
-client = genai.Client(api_key=config.GOOGLE_GENAI_API_KEY)
-
 
 def generate_image(title, description):
-    logger.info(f"Generating image for: {title}")
+    client = genai.Client(api_key=config.GOOGLE_GENAI_API_KEY)
 
     prompt = (
-        f"Generate an image: Professional social media graphic for a news article titled: '{title}'. "
-        f"Context: {description[:200]}. "
-        f"Style: Modern, clean, vibrant colors. No text overlay."
+        f"Generate an image: Professional social media graphic for news article: '{title}'. "
+        f"Context: {description[:200]}. Modern, clean, vibrant. No text overlay."
     )
 
     try:
@@ -35,21 +32,22 @@ def generate_image(title, description):
                     break
 
         if not image_data:
-            logger.warning("No image generated")
             return ""
 
-        os.makedirs(config.STORAGE_DIR, exist_ok=True)
-        filename = f"img_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-        filepath = os.path.join(config.STORAGE_DIR, filename)
+        if isinstance(image_data, str):
+            image_bytes = base64.b64decode(image_data)
+        else:
+            image_bytes = image_data
 
-        with open(filepath, "wb") as f:
-            if isinstance(image_data, str):
-                f.write(base64.b64decode(image_data))
-            else:
-                f.write(image_data)
+        # Upload to Supabase Storage
+        filename = f"img_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.png"
+        sb = db.get_client()
+        sb.storage.from_("images").upload(filename, image_bytes, {"content-type": "image/png"})
 
-        logger.info(f"Image saved: {filepath}")
-        return filepath
+        # Get public URL
+        public_url = f"{config.SUPABASE_URL}/storage/v1/object/public/images/{filename}"
+        return public_url
+
     except Exception as e:
         logger.error(f"Image generation failed: {e}")
         return ""

@@ -2,8 +2,7 @@
 __pycache__/
 *.pyc
 *.db
-storage/images/*
-!storage/images/.gitkeep
-logs/
 .vercel/
 venv/
+storage/
+logs/
