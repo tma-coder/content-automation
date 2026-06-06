@@ -9,12 +9,16 @@ sys.path.insert(0, ROOT)
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
+from jinja2 import Environment, FileSystemLoader
 
 app = FastAPI()
 
 TEMPLATES_DIR = os.path.join(ROOT, "templates")
-templates = Jinja2Templates(directory=TEMPLATES_DIR)
+jinja_env = Environment(loader=FileSystemLoader(TEMPLATES_DIR), auto_reload=False, cache_size=0)
+
+
+def render(name, **ctx):
+    return HTMLResponse(jinja_env.get_template(name).render(**ctx))
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -26,10 +30,8 @@ async def dashboard(request: Request):
         history = db.get_post_history(limit=20)
         mode = "AUTO" if config.AUTO_MODE else "MANUAL"
         today = db.get_daily_post_count("facebook")
-        return templates.TemplateResponse("index.html", {
-            "request": request, "pending": pending, "history": history,
-            "mode": mode, "posts_today": today, "total_pending": len(pending),
-        })
+        return render("index.html", pending=pending, history=history,
+                      mode=mode, posts_today=today, total_pending=len(pending))
     except Exception as e:
         return HTMLResponse(f"<pre>Error: {e}\n\n{traceback.format_exc()}</pre>", status_code=500)
 
@@ -73,7 +75,7 @@ async def view_article(request: Request, article_id: int):
         article = db.get_article(article_id)
         if not article:
             return HTMLResponse("Not found", status_code=404)
-        return templates.TemplateResponse("article.html", {"request": request, "article": article})
+        return render("article.html", article=article)
     except Exception as e:
         return HTMLResponse(f"<pre>Error: {e}\n\n{traceback.format_exc()}</pre>", status_code=500)
 
