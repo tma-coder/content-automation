@@ -3,11 +3,10 @@ import sys
 import asyncio
 import traceback
 
-# Add project root to path for imports
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from jinja2 import Environment, FileSystemLoader
 
@@ -30,20 +29,22 @@ async def dashboard(request: Request):
         history = db.get_post_history(limit=20)
         mode = "AUTO" if config.AUTO_MODE else "MANUAL"
         today = db.get_daily_post_count("facebook")
+        topics = ", ".join(config.NEWS_TOPICS)
         return render("index.html", pending=pending, history=history,
-                      mode=mode, posts_today=today, total_pending=len(pending))
+                      mode=mode, posts_today=today, total_pending=len(pending), topics=topics)
     except Exception as e:
         return HTMLResponse(f"<pre>Error: {e}\n\n{traceback.format_exc()}</pre>", status_code=500)
 
 
 @app.post("/trigger")
-async def trigger():
+async def trigger(topics: str = Form("")):
     try:
         import config
         from core.pipeline import run_cycle
-        await asyncio.to_thread(run_cycle, auto=config.AUTO_MODE)
+        custom_topics = [t.strip() for t in topics.split(",") if t.strip()] if topics else None
+        await asyncio.to_thread(run_cycle, auto=config.AUTO_MODE, topics=custom_topics)
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"error": str(e), "trace": traceback.format_exc()}, status_code=500)
     return RedirectResponse(url="/", status_code=303)
 
 
@@ -99,8 +100,6 @@ async def health():
 @app.get("/diagnose")
 async def diagnose():
     results = {}
-
-    # 1. Check env vars
     import config
     results["env"] = {
         "SUPABASE_URL": bool(config.SUPABASE_URL),
@@ -109,24 +108,18 @@ async def diagnose():
         "META_PAGE_ACCESS_TOKEN": bool(config.META_PAGE_ACCESS_TOKEN),
         "FACEBOOK_PAGE_ID": bool(config.FACEBOOK_PAGE_ID),
     }
-
-    # 2. Test Supabase connection
     try:
         import db
         pending = db.get_pending_articles()
         results["supabase"] = {"ok": True, "pending_count": len(pending)}
     except Exception as e:
         results["supabase"] = {"ok": False, "error": str(e)}
-
-    # 3. Test Google News RSS
     try:
         from core.news_monitor import fetch_news
         items = fetch_news("technology", max_items=1)
         results["news_rss"] = {"ok": True, "items": len(items)}
     except Exception as e:
         results["news_rss"] = {"ok": False, "error": str(e)}
-
-    # 4. Test OpenRouter API
     try:
         from openai import OpenAI
         client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=config.OPENROUTER_API_KEY)
@@ -138,5 +131,4 @@ async def diagnose():
         results["openrouter"] = {"ok": True, "response": resp.choices[0].message.content[:50]}
     except Exception as e:
         results["openrouter"] = {"ok": False, "error": str(e)}
-
     return results

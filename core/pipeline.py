@@ -1,5 +1,5 @@
 import logging
-from core.news_monitor import fetch_all_topics
+from core.news_monitor import fetch_all_topics, fetch_news
 from core.article_generator import generate_article
 from core.image_generator import generate_image
 from publishers.facebook_pub import FacebookPublisher
@@ -23,7 +23,7 @@ def process_news_item(item, auto_approve=False):
         source_url=item.link, source_title=item.title,
         generated_title=article.title, short_text=article.short_text,
         long_text=article.long_text, hashtags=article.hashtags,
-        image_url=image_url, status=status,
+        image_url=image_url, status=status, published_at=item.published,
     )
 
     if auto_approve and article_id:
@@ -55,10 +55,17 @@ def publish_article(article_id):
     return results
 
 
-def run_cycle(auto=False):
-    items = fetch_all_topics(max_per_topic=1)
+def run_cycle(auto=False, topics=None):
+    if topics:
+        items = []
+        for topic in topics:
+            items.extend(fetch_news(topic, max_items=1))
+    else:
+        items = fetch_all_topics(max_per_topic=1)
+
     if not items:
         return []
+
     items = items[:config.MAX_ARTICLES_PER_CYCLE]
     article_ids = []
     for item in items:

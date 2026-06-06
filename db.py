@@ -22,7 +22,7 @@ def article_exists(source_url):
     return len(res.data) > 0
 
 
-def save_article(source_url, source_title, generated_title, short_text, long_text, hashtags, image_url, status="pending"):
+def save_article(source_url, source_title, generated_title, short_text, long_text, hashtags, image_url, status="pending", published_at=""):
     data = {
         "source_hash": hash_url(source_url),
         "source_url": source_url,
@@ -33,6 +33,7 @@ def save_article(source_url, source_title, generated_title, short_text, long_tex
         "hashtags": hashtags,
         "image_url": image_url,
         "status": status,
+        "published_at": published_at or None,
     }
     res = get_client().table("articles").insert(data).execute()
     return res.data[0]["id"] if res.data else None
