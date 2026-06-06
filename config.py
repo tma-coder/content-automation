@@ -3,6 +3,7 @@ import os
 GOOGLE_GENAI_API_KEY = os.environ.get("GOOGLE_GENAI_API_KEY", "")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_IMAGE_API_KEY = os.environ.get("OPENROUTER_IMAGE_API_KEY", "")
+POLLINATIONS_API_KEY = os.environ.get("POLLINATIONS_API_KEY", "")
 META_PAGE_ACCESS_TOKEN = os.environ.get("META_PAGE_ACCESS_TOKEN", "")
 FACEBOOK_PAGE_ID = os.environ.get("FACEBOOK_PAGE_ID", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")

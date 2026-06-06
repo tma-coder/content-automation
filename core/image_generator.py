@@ -7,13 +7,15 @@ import config
 
 logger = logging.getLogger(__name__)
 
+POLLINATIONS_API = "https://image.pollinations.ai/prompt"
+
 
 def generate_image(title, description=""):
     """Try multiple free image providers until one works."""
     providers = [
+        _pollinations_api,
         _smart_pollinations,
-        _pollinations_v1,
-        _pollinations_v2,
+        _pollinations_direct,
         _picsum,
     ]
 
@@ -35,11 +37,44 @@ def regenerate_image(title):
     seed = int(time.time())
     short = _clean(title)
     prompt = urllib.parse.quote(f"{short} creative news illustration")
-    return f"https://image.pollinations.ai/prompt/{prompt}?width=800&height=450&seed={seed}&nologo=true"
+
+    if config.POLLINATIONS_API_KEY:
+        return f"{POLLINATIONS_API}/{prompt}?width=800&height=450&seed={seed}&nologo=true&key={config.POLLINATIONS_API_KEY}"
+
+    return f"{POLLINATIONS_API}/{prompt}?width=800&height=450&seed={seed}&nologo=true"
 
 
 def _clean(title):
     return title[:60].replace('"', '').replace("'", '').replace("&", "and").strip()
+
+
+def _pollinations_api(title):
+    """Pollinations.ai with API key - priority queue, no rate limits."""
+    if not config.POLLINATIONS_API_KEY:
+        return ""
+
+    short = _clean(title)
+    seed = int(hashlib.md5(title.encode()).hexdigest()[:8], 16)
+    prompt = urllib.parse.quote(f"{short} professional news article cover photo, digital art, vibrant colors")
+
+    # Use API key via header for authenticated request
+    url = f"{POLLINATIONS_API}/{prompt}?width=800&height=450&seed={seed}&nologo=true&model=flux"
+
+    try:
+        resp = httpx.head(
+            url,
+            headers={"Authorization": f"Bearer {config.POLLINATIONS_API_KEY}"},
+            timeout=8,
+            follow_redirects=True,
+        )
+        if resp.status_code < 400:
+            # Return URL with key param for browser loading
+            return f"{url}&key={config.POLLINATIONS_API_KEY}"
+    except Exception as e:
+        logger.warning(f"Pollinations API auth failed: {e}")
+
+    # Try with key as query param
+    return f"{url}&key={config.POLLINATIONS_API_KEY}"
 
 
 def _smart_pollinations(title):
@@ -72,9 +107,13 @@ def _smart_pollinations(title):
             desc = resp.choices[0].message.content.strip()[:100]
             encoded = urllib.parse.quote(desc)
             seed = int(hashlib.md5(title.encode()).hexdigest()[:8], 16)
-            url = f"https://image.pollinations.ai/prompt/{encoded}?width=800&height=450&seed={seed}&nologo=true"
+
+            base_url = f"{POLLINATIONS_API}/{encoded}?width=800&height=450&seed={seed}&nologo=true"
+            if config.POLLINATIONS_API_KEY:
+                base_url += f"&key={config.POLLINATIONS_API_KEY}"
+
             logger.info(f"Smart prompt via {model}: {desc}")
-            return url
+            return base_url
         except Exception as e:
             logger.warning(f"Smart prompt {model} failed: {e}")
             continue
@@ -82,20 +121,15 @@ def _smart_pollinations(title):
     return ""
 
 
-def _pollinations_v1(title):
-    """Pollinations.ai - direct prompt."""
+def _pollinations_direct(title):
+    """Pollinations.ai - direct prompt, no LLM needed."""
     short = _clean(title)
     seed = int(hashlib.md5(title.encode()).hexdigest()[:8], 16)
     prompt = urllib.parse.quote(f"{short} news cover photo digital art")
-    return f"https://image.pollinations.ai/prompt/{prompt}?width=800&height=450&seed={seed}&nologo=true"
-
-
-def _pollinations_v2(title):
-    """Pollinations.ai - Flux model."""
-    short = _clean(title)
-    seed = int(hashlib.md5(title.encode()).hexdigest()[:8], 16)
-    prompt = urllib.parse.quote(f"{short} professional thumbnail")
-    return f"https://pollinations.ai/p/{prompt}?width=800&height=450&seed={seed}&nologo=true&model=flux"
+    url = f"{POLLINATIONS_API}/{prompt}?width=800&height=450&seed={seed}&nologo=true"
+    if config.POLLINATIONS_API_KEY:
+        url += f"&key={config.POLLINATIONS_API_KEY}"
+    return url
 
 
 def _picsum(title):
