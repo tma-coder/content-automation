@@ -94,3 +94,49 @@ async def cron(request: Request):
 @app.get("/health")
 async def health():
     return {"status": "ok", "templates": os.path.exists(TEMPLATES_DIR), "root": ROOT}
+
+
+@app.get("/diagnose")
+async def diagnose():
+    results = {}
+
+    # 1. Check env vars
+    import config
+    results["env"] = {
+        "SUPABASE_URL": bool(config.SUPABASE_URL),
+        "SUPABASE_KEY": bool(config.SUPABASE_KEY),
+        "OPENROUTER_API_KEY": bool(config.OPENROUTER_API_KEY),
+        "META_PAGE_ACCESS_TOKEN": bool(config.META_PAGE_ACCESS_TOKEN),
+        "FACEBOOK_PAGE_ID": bool(config.FACEBOOK_PAGE_ID),
+    }
+
+    # 2. Test Supabase connection
+    try:
+        import db
+        pending = db.get_pending_articles()
+        results["supabase"] = {"ok": True, "pending_count": len(pending)}
+    except Exception as e:
+        results["supabase"] = {"ok": False, "error": str(e)}
+
+    # 3. Test Google News RSS
+    try:
+        from core.news_monitor import fetch_news
+        items = fetch_news("technology", max_items=1)
+        results["news_rss"] = {"ok": True, "items": len(items)}
+    except Exception as e:
+        results["news_rss"] = {"ok": False, "error": str(e)}
+
+    # 4. Test OpenRouter API
+    try:
+        from openai import OpenAI
+        client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=config.OPENROUTER_API_KEY)
+        resp = client.chat.completions.create(
+            model="google/gemini-2.0-flash-exp:free",
+            messages=[{"role": "user", "content": "Say hello in 5 words"}],
+            max_tokens=20,
+        )
+        results["openrouter"] = {"ok": True, "response": resp.choices[0].message.content[:50]}
+    except Exception as e:
+        results["openrouter"] = {"ok": False, "error": str(e)}
+
+    return results
