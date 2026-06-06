@@ -2,50 +2,93 @@ import logging
 import urllib.parse
 import hashlib
 import time
+import base64
+import os
+import config
 
 logger = logging.getLogger(__name__)
 
-# Image generation providers - tries in order
-PROVIDERS = ["pollinations", "openrouter"]
+# Image models on OpenRouter (tries in order)
+IMAGE_MODELS = [
+    "openai/dall-e-3",
+    "google/imagen-4",
+    "stability/stable-diffusion-3",
+]
+
+# Free fallback models to generate Pollinations URL
+FREE_MODELS = [
+    "google/gemini-3.5-flash:free",
+    "google/gemma-4-31b-it:free",
+    "deepseek/deepseek-chat-v3-0324:free",
+]
 
 
-def generate_image(title, description="", provider=None):
-    """Try multiple providers for image generation."""
-    providers = [provider] if provider else PROVIDERS
+def generate_image(title, description=""):
+    """Try OpenRouter image API first, then Pollinations fallback."""
+    # Try OpenRouter with dedicated image API key
+    if config.OPENROUTER_IMAGE_API_KEY:
+        url = _openrouter_image(title)
+        if url:
+            return url
 
-    for p in providers:
-        try:
-            if p == "pollinations":
-                url = _pollinations(title)
-            elif p == "openrouter":
-                url = _openrouter(title, description)
-            else:
-                continue
-
-            if url:
-                logger.info(f"Image generated via {p}: {title[:50]}")
-                return url
-        except Exception as e:
-            logger.warning(f"Image provider {p} failed: {e}")
-            continue
-
-    return ""
+    # Fallback to Pollinations
+    return _pollinations(title)
 
 
-def regenerate_image(title, provider=None):
+def regenerate_image(title):
     """Regenerate with different seed/style."""
-    seed = int(time.time())
-    if provider == "openrouter":
-        return _openrouter(title, "", seed=seed)
+    if config.OPENROUTER_IMAGE_API_KEY:
+        url = _openrouter_image(title, style="different angle, creative composition")
+        if url:
+            return url
 
+    seed = int(time.time())
     short = title[:80].replace('"', '').replace("'", "")
     prompt = f"news cover art {short}, digital illustration"
     encoded = urllib.parse.quote(prompt)
     return f"https://image.pollinations.ai/prompt/{encoded}?width=800&height=500&seed={seed}&nologo=true"
 
 
+def _openrouter_image(title, style=""):
+    """Generate image using OpenRouter image API."""
+    from openai import OpenAI
+
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=config.OPENROUTER_IMAGE_API_KEY,
+    )
+
+    short = title[:100].replace('"', '').replace("'", "")
+    prompt = f"Professional news article thumbnail about: {short}. Modern, clean design, vibrant colors, no text. {style}"
+
+    for model in IMAGE_MODELS:
+        try:
+            logger.info(f"Trying image model: {model}")
+            response = client.images.generate(
+                model=model,
+                prompt=prompt,
+                n=1,
+                size="1024x1024",
+            )
+
+            if response.data and response.data[0].url:
+                logger.info(f"Image generated via {model}")
+                return response.data[0].url
+
+            if response.data and response.data[0].b64_json:
+                # Upload base64 image to Supabase Storage
+                return _upload_to_supabase(response.data[0].b64_json, title)
+
+        except Exception as e:
+            logger.warning(f"Image model {model} failed: {e}")
+            continue
+
+    # Fallback: use free model to create a smart Pollinations URL
+    return _smart_pollinations(title)
+
+
 def _pollinations(title):
-    """Pollinations.ai - free, no API key, generates on URL load."""
+    """Pollinations.ai - free, generates on URL load."""
     short = title[:80].replace('"', '').replace("'", "")
     prompt = f"news thumbnail {short}, modern digital art, vibrant"
     encoded = urllib.parse.quote(prompt)
@@ -53,47 +96,44 @@ def _pollinations(title):
     return f"https://image.pollinations.ai/prompt/{encoded}?width=800&height=500&seed={seed}&nologo=true"
 
 
-def _openrouter(title, description="", seed=None):
-    """Use OpenRouter with a free model to generate image via markdown."""
-    import config
+def _smart_pollinations(title):
+    """Use free LLM to create a better image prompt for Pollinations."""
     from openai import OpenAI
 
-    if not config.OPENROUTER_API_KEY:
-        return ""
+    api_key = config.OPENROUTER_IMAGE_API_KEY or config.OPENROUTER_API_KEY
+    if not api_key:
+        return _pollinations(title)
 
-    client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=config.OPENROUTER_API_KEY)
+    client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
 
-    prompt = f"""Generate a detailed image description for a news article thumbnail about: {title[:100]}
-Return ONLY a Pollinations.ai URL in this exact format (nothing else):
-https://image.pollinations.ai/prompt/YOUR_DESCRIPTION_HERE?width=800&height=500&nologo=true
-
-Make the description vivid, professional, suitable for news. URL-encode spaces as %20. Keep it under 200 chars."""
-
-    models = [
-        "google/gemini-3.5-flash:free",
-        "google/gemma-4-31b-it:free",
-        "deepseek/deepseek-chat-v3-0324:free",
-    ]
-
-    for model in models:
+    for model in FREE_MODELS:
         try:
             resp = client.chat.completions.create(
                 model=model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=300,
+                messages=[{"role": "user", "content": f"Write a short (under 15 words) vivid image description for a news thumbnail about: {title[:80]}. Just the description, nothing else."}],
+                max_tokens=50,
             )
-            text = resp.choices[0].message.content.strip()
-            # Extract URL from response
-            for line in text.split("\n"):
-                line = line.strip()
-                if line.startswith("https://image.pollinations.ai/"):
-                    return line
-            # If model returned a description, build the URL
-            if text and not text.startswith("http"):
-                desc = text[:200].replace('"', '').replace("'", "")
-                encoded = urllib.parse.quote(desc)
-                return f"https://image.pollinations.ai/prompt/{encoded}?width=800&height=500&nologo=true"
+            desc = resp.choices[0].message.content.strip()[:150]
+            encoded = urllib.parse.quote(desc)
+            seed = int(hashlib.md5(title.encode()).hexdigest()[:8], 16)
+            return f"https://image.pollinations.ai/prompt/{encoded}?width=800&height=500&seed={seed}&nologo=true"
         except Exception:
             continue
 
-    return ""
+    return _pollinations(title)
+
+
+def _upload_to_supabase(b64_data, title):
+    """Upload base64 image to Supabase Storage and return public URL."""
+    try:
+        import db as database
+        filename = f"img_{hashlib.md5(title.encode()).hexdigest()[:12]}_{int(time.time())}.png"
+        image_bytes = base64.b64decode(b64_data)
+        client = database.get_client()
+        client.storage.from_("images").upload(filename, image_bytes, {"content-type": "image/png"})
+        public_url = f"{config.SUPABASE_URL}/storage/v1/object/public/images/{filename}"
+        logger.info(f"Image uploaded to Supabase: {filename}")
+        return public_url
+    except Exception as e:
+        logger.error(f"Supabase upload failed: {e}")
+        return ""
