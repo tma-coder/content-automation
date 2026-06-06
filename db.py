@@ -60,6 +60,18 @@ def update_image(article_id, image_url):
     get_client().table("articles").update({"image_url": image_url}).eq("id", article_id).execute()
 
 
+def delete_article(article_id):
+    get_client().table("post_log").delete().eq("article_id", article_id).execute()
+    get_client().table("articles").delete().eq("id", article_id).execute()
+
+
+def clear_history():
+    get_client().table("post_log").delete().in_("article_id",
+        [r["id"] for r in get_client().table("articles").select("id").in_("status", ["posted", "failed", "rejected"]).execute().data]
+    ).execute()
+    get_client().table("articles").delete().in_("status", ["posted", "failed", "rejected"]).execute()
+
+
 def log_post(article_id, platform, success, post_id="", error_message=""):
     get_client().table("post_log").insert({
         "article_id": article_id,

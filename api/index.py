@@ -83,6 +83,20 @@ async def regenerate_image_route(article_id: int):
     return RedirectResponse(url="/", status_code=303)
 
 
+@app.post("/delete/{article_id}")
+async def delete_article(article_id: int):
+    import db
+    db.delete_article(article_id)
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.post("/clear-history")
+async def clear_history():
+    import db
+    db.clear_history()
+    return RedirectResponse(url="/", status_code=303)
+
+
 @app.get("/article/{article_id}", response_class=HTMLResponse)
 async def view_article(request: Request, article_id: int):
     try:

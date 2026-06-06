@@ -7,159 +7,163 @@
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#e1e4e8;min-height:100vh}
-        .header{background:linear-gradient(135deg,#1a1d29,#252836);border-bottom:1px solid #2d3148;padding:20px 40px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
-        .header h1{font-size:24px;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-        .stats{display:flex;gap:20px;padding:20px 40px;background:#161822;flex-wrap:wrap}
-        .stat{background:#1e2030;border:1px solid #2d3148;border-radius:12px;padding:16px 24px;flex:1;min-width:150px}
-        .stat .label{font-size:12px;color:#8b8fa3;text-transform:uppercase;letter-spacing:1px}
-        .stat .value{font-size:28px;font-weight:700;margin-top:4px}
+        .header{background:linear-gradient(135deg,#1a1d29,#252836);border-bottom:1px solid #2d3148;padding:16px 30px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+        .header h1{font-size:20px;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .badge{padding:4px 12px;border-radius:16px;font-size:11px;font-weight:700}
+        .badge-manual{background:#d97706;color:#fff}.badge-auto{background:#059669;color:#fff}
+        .fetch-bar{background:#1a1d29;padding:12px 30px;border-bottom:1px solid #2d3148;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+        .fetch-bar input{background:#0f1117;border:1px solid #2d3148;color:#e1e4e8;padding:8px 14px;border-radius:8px;font-size:13px;flex:1;min-width:180px}
+        .fetch-bar input:focus{outline:none;border-color:#667eea}
+        .fetch-bar input::placeholder{color:#5a5f7a}
+        .quick-topics{display:flex;gap:6px;flex-wrap:wrap}
+        .qt{background:#2d3148;color:#8b8fa3;border:none;padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer}
+        .qt:hover{background:#667eea;color:#fff}
+        .stats{display:flex;gap:12px;padding:12px 30px;background:#161822;flex-wrap:wrap}
+        .stat{background:#1e2030;border:1px solid #2d3148;border-radius:10px;padding:12px 18px;flex:1;min-width:120px}
+        .stat .l{font-size:10px;color:#8b8fa3;text-transform:uppercase;letter-spacing:1px}
+        .stat .v{font-size:22px;font-weight:700;margin-top:2px}
         .green{color:#34d399}.orange{color:#fbbf24}.blue{color:#60a5fa}
-        .btn{padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
-        .btn:hover{transform:translateY(-1px);opacity:.9}
+        .btn{padding:8px 16px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+        .btn:hover{opacity:.85}
         .btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
         .btn-success{background:#059669;color:#fff}
         .btn-danger{background:#dc2626;color:#fff}
-        .btn-sm{padding:6px 14px;font-size:12px}
-        .badge{padding:6px 16px;border-radius:20px;font-size:12px;font-weight:700}
-        .badge-manual{background:#d97706;color:#fff}
-        .badge-auto{background:#059669;color:#fff}
-        .fetch-bar{background:#1a1d29;padding:16px 40px;border-bottom:1px solid #2d3148;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-        .fetch-bar input{background:#0f1117;border:1px solid #2d3148;color:#e1e4e8;padding:10px 16px;border-radius:8px;font-size:14px;flex:1;min-width:200px}
-        .fetch-bar input::placeholder{color:#5a5f7a}
-        .fetch-bar input:focus{outline:none;border-color:#667eea}
-        .quick-topics{display:flex;gap:8px;flex-wrap:wrap}
-        .quick-topic{background:#2d3148;color:#8b8fa3;border:none;padding:6px 12px;border-radius:16px;font-size:12px;cursor:pointer}
-        .quick-topic:hover{background:#667eea;color:#fff}
-        .main{padding:30px 40px}
-        .section{margin-bottom:40px}
-        .section-title{font-size:18px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
-        .count{background:#667eea;color:#fff;padding:2px 10px;border-radius:12px;font-size:12px}
-        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:20px}
-        .card{background:#1e2030;border:1px solid #2d3148;border-radius:12px;overflow:hidden;transition:border-color .2s}
+        .btn-sm{padding:4px 10px;font-size:11px}
+        .btn-ghost{background:transparent;border:1px solid #2d3148;color:#8b8fa3}
+        .main{padding:20px 30px}
+        .section{margin-bottom:30px}
+        .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+        .section-title{font-size:16px;font-weight:600;display:flex;align-items:center;gap:6px}
+        .count{background:#667eea;color:#fff;padding:1px 8px;border-radius:10px;font-size:11px}
+        .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+        .card{background:#1e2030;border:1px solid #2d3148;border-radius:10px;overflow:hidden;transition:border-color .2s}
         .card:hover{border-color:#667eea}
-        .card-img{width:100%;height:200px;object-fit:cover;background:#252836;display:block;opacity:0;transition:opacity .3s}
-        .img-wrap{min-height:200px;background:#252836}
-        .img-loading{height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#252836}
-        .card-body{padding:20px}
-        .card-title{font-size:16px;font-weight:600;margin-bottom:8px;line-height:1.4}
-        .card-text{font-size:13px;color:#8b8fa3;line-height:1.6;margin-bottom:10px}
-        .card-tags{font-size:12px;color:#667eea;margin-bottom:8px;word-break:break-all}
-        .card-meta{font-size:11px;color:#5a5f7a;margin-bottom:12px;display:flex;flex-direction:column;gap:2px}
-        .card-actions{display:flex;gap:8px}
-        table{width:100%;border-collapse:collapse}
-        th{text-align:left;padding:12px 16px;font-size:12px;color:#8b8fa3;text-transform:uppercase;border-bottom:1px solid #2d3148}
-        td{padding:14px 16px;font-size:14px;border-bottom:1px solid #1a1d29}
-        .status{padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600}
+        .card-img-wrap{position:relative;height:140px;background:#252836;overflow:hidden}
+        .card-img{width:100%;height:140px;object-fit:cover;display:block;opacity:0;transition:opacity .3s}
+        .card-img.loaded{opacity:1}
+        .img-loading{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#252836}
+        .img-actions{position:absolute;top:6px;right:6px;display:flex;gap:4px}
+        .img-btn{background:rgba(0,0,0,.7);color:#fff;border:none;padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer}
+        .card-body{padding:12px}
+        .card-title{font-size:13px;font-weight:600;margin-bottom:4px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .card-text{font-size:11px;color:#8b8fa3;line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .card-tags{font-size:10px;color:#667eea;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .card-meta{font-size:10px;color:#5a5f7a;margin-bottom:8px;line-height:1.5}
+        .card-actions{display:flex;gap:4px;flex-wrap:wrap}
+        table{width:100%;border-collapse:collapse;font-size:13px}
+        th{text-align:left;padding:8px 12px;font-size:11px;color:#8b8fa3;text-transform:uppercase;border-bottom:1px solid #2d3148}
+        td{padding:10px 12px;border-bottom:1px solid #1a1d29}
+        .status{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}
         .s-posted{background:#064e3b;color:#34d399}
         .s-pending{background:#78350f;color:#fbbf24}
         .s-failed{background:#7f1d1d;color:#f87171}
-        .empty{text-align:center;padding:60px 20px;color:#5a5f7a}
-        .empty .icon{font-size:48px;margin-bottom:12px}
+        .empty{text-align:center;padding:40px 20px;color:#5a5f7a;font-size:13px}
         form.inline{display:inline}
-        .loading{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:999;justify-content:center;align-items:center;flex-direction:column;gap:16px}
-        .loading.active{display:flex}
-        .loading p{color:#e1e4e8;font-size:16px}
-        .spinner{width:40px;height:40px;border:4px solid #2d3148;border-top:4px solid #667eea;border-radius:50%;animation:spin 1s linear infinite}
+        .spinner{width:20px;height:20px;border:3px solid #2d3148;border-top:3px solid #667eea;border-radius:50%;animation:spin .8s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
-        @media(max-width:600px){.header,.stats,.main,.fetch-bar{padding:16px}.grid{grid-template-columns:1fr}}
+        .loading{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:999;justify-content:center;align-items:center;flex-direction:column;gap:12px}
+        .loading.active{display:flex}
+        .loading p{color:#e1e4e8;font-size:14px}
+        @media(max-width:600px){.header,.stats,.main,.fetch-bar{padding:12px}.grid{grid-template-columns:1fr}}
     </style>
 </head>
 <body>
-    <div class="loading" id="loading"><div class="spinner"></div><p>Fetching news & generating content...</p></div>
-
+    <div class="loading" id="loading"><div class="spinner" style="width:36px;height:36px"></div><p>Working...</p></div>
     <div class="header">
         <h1>Content Automation</h1>
-        <span class="badge {{ 'badge-auto' if mode == 'AUTO' else 'badge-manual' }}">{{ mode }} MODE</span>
+        <span class="badge {{ 'badge-auto' if mode == 'AUTO' else 'badge-manual' }}">{{ mode }}</span>
     </div>
-
     <div class="fetch-bar">
-        <form action="/trigger" method="post" style="display:flex;gap:12px;flex:1;flex-wrap:wrap;align-items:center" onsubmit="showLoading()">
-            <input type="text" name="topics" placeholder="Enter topics (e.g. AI, crypto, sports)" value="{{ topics }}">
+        <form action="/trigger" method="post" style="display:flex;gap:8px;flex:1;flex-wrap:wrap;align-items:center" onsubmit="showLoading()">
+            <input type="text" name="topics" placeholder="Topics (e.g. AI, crypto, sports)" value="{{ topics }}">
             <button class="btn btn-primary" type="submit">Fetch News</button>
         </form>
         <div class="quick-topics">
-            <button class="quick-topic" onclick="setTopic('AI')">AI</button>
-            <button class="quick-topic" onclick="setTopic('cryptocurrency')">Crypto</button>
-            <button class="quick-topic" onclick="setTopic('technology')">Tech</button>
-            <button class="quick-topic" onclick="setTopic('business')">Business</button>
-            <button class="quick-topic" onclick="setTopic('science')">Science</button>
-            <button class="quick-topic" onclick="setTopic('sports')">Sports</button>
-            <button class="quick-topic" onclick="setTopic('health')">Health</button>
-            <button class="quick-topic" onclick="setTopic('world news')">World</button>
+            <button class="qt" onclick="setTopic('AI')">AI</button>
+            <button class="qt" onclick="setTopic('cryptocurrency')">Crypto</button>
+            <button class="qt" onclick="setTopic('technology')">Tech</button>
+            <button class="qt" onclick="setTopic('business')">Business</button>
+            <button class="qt" onclick="setTopic('science')">Science</button>
+            <button class="qt" onclick="setTopic('sports')">Sports</button>
+            <button class="qt" onclick="setTopic('health')">Health</button>
+            <button class="qt" onclick="setTopic('world news')">World</button>
         </div>
     </div>
-
     <div class="stats">
-        <div class="stat"><div class="label">Pending Review</div><div class="value orange">{{ total_pending }}</div></div>
-        <div class="stat"><div class="label">Posted Today</div><div class="value green">{{ posts_today }}</div></div>
-        <div class="stat"><div class="label">Mode</div><div class="value blue">{{ mode }}</div></div>
+        <div class="stat"><div class="l">Pending</div><div class="v orange">{{ total_pending }}</div></div>
+        <div class="stat"><div class="l">Posted Today</div><div class="v green">{{ posts_today }}</div></div>
+        <div class="stat"><div class="l">Mode</div><div class="v blue">{{ mode }}</div></div>
     </div>
-
     <div class="main">
         <div class="section">
-            <div class="section-title">Pending Articles {% if total_pending %}<span class="count">{{ total_pending }}</span>{% endif %}</div>
+            <div class="section-header">
+                <div class="section-title">Pending {% if total_pending %}<span class="count">{{ total_pending }}</span>{% endif %}</div>
+            </div>
             {% if pending %}
             <div class="grid">
                 {% for a in pending %}
                 <div class="card">
-                    <div style="position:relative" class="img-wrap">
+                    <div class="card-img-wrap">
                         {% if a.image_url %}
-                        <div class="img-loading" id="imgload-{{ a.id }}"><div class="spinner" style="width:24px;height:24px;border-width:3px"></div><span style="font-size:12px;color:#8b8fa3;margin-top:8px">Generating image...</span></div>
+                        <div class="img-loading" id="il{{ a.id }}"><div class="spinner"></div></div>
                         <img class="card-img" src="{{ a.image_url }}" loading="lazy"
-                            onload="document.getElementById('imgload-{{ a.id }}').style.display='none';this.style.opacity=1"
-                            onerror="document.getElementById('imgload-{{ a.id }}').innerHTML='<span style=color:#5a5f7a>⚠️ Image unavailable</span>'">
+                            onload="this.classList.add('loaded');document.getElementById('il{{ a.id }}').style.display='none'"
+                            onerror="document.getElementById('il{{ a.id }}').innerHTML='<span style=color:#5a5f7a;font-size:11px>⚠️ Retry with New Image</span>'">
                         {% else %}
-                        <div class="img-loading"><span style="color:#5a5f7a">No image</span></div>
+                        <div class="img-loading"><span style="color:#5a5f7a;font-size:11px">No image</span></div>
                         {% endif %}
-                        <div style="position:absolute;top:8px;right:8px;display:flex;gap:4px">
-                            <form action="/regenerate-image/{{ a.id }}" method="post" class="inline"><button class="btn btn-sm" style="background:rgba(0,0,0,.7);color:#fff;font-size:11px">🔄 New Image</button></form>
+                        <div class="img-actions">
+                            <form action="/regenerate-image/{{ a.id }}" method="post" class="inline"><button class="img-btn">🔄 New Image</button></form>
+                            <form action="/delete/{{ a.id }}" method="post" class="inline"><button class="img-btn" onclick="return confirm('Delete this article?')">🗑️</button></form>
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="card-title">#{{ a.id }}: {{ a.generated_title }}</div>
-                        <div class="card-text">{{ a.short_text[:200] }}{% if a.short_text|length > 200 %}...{% endif %}</div>
-                        <div class="card-tags">{{ a.hashtags }}</div>
+                        <div class="card-title">{{ a.generated_title }}</div>
+                        <div class="card-text">{{ a.short_text[:120] }}</div>
+                        <div class="card-tags">{{ a.hashtags[:80] }}</div>
                         <div class="card-meta">
-                            <span>📰 {{ a.source_title[:60] }}</span>
-                            {% if a.published_at %}<span>📅 Published: {{ a.published_at }}</span>{% endif %}
-                            <span>⏰ Fetched: {{ a.created_at[:19] }}</span>
+                            📰 {{ a.source_title[:50] }}<br>
+                            {% if a.published_at %}📅 {{ a.published_at }}{% endif %}
                         </div>
                         <div class="card-actions">
-                            <form action="/approve/{{ a.id }}" method="post" class="inline" onsubmit="showLoading()"><button class="btn btn-success btn-sm">Approve & Post</button></form>
-                            <form action="/reject/{{ a.id }}" method="post" class="inline"><button class="btn btn-danger btn-sm">Reject</button></form>
-                            <a href="/article/{{ a.id }}" class="btn btn-sm" style="background:#2d3148;color:#e1e4e8">View</a>
+                            <form action="/approve/{{ a.id }}" method="post" class="inline" onsubmit="showLoading()"><button class="btn btn-success btn-sm">✅ Post</button></form>
+                            <form action="/reject/{{ a.id }}" method="post" class="inline"><button class="btn btn-danger btn-sm">✖ Reject</button></form>
+                            <a href="/article/{{ a.id }}" class="btn btn-ghost btn-sm">View</a>
                         </div>
                     </div>
                 </div>
                 {% endfor %}
             </div>
             {% else %}
-            <div class="empty"><div class="icon">📰</div><p>No pending articles. Enter a topic above and click <strong>Fetch News</strong> to get started.</p></div>
+            <div class="empty">📰 No pending articles. Enter a topic and click <b>Fetch News</b>.</div>
             {% endif %}
         </div>
-
         <div class="section">
-            <div class="section-title">Posting History</div>
+            <div class="section-header">
+                <div class="section-title">History</div>
+                {% if history %}
+                <form action="/clear-history" method="post" class="inline" onsubmit="return confirm('Clear all history?')"><button class="btn btn-ghost btn-sm">🗑️ Clear History</button></form>
+                {% endif %}
+            </div>
             {% if history %}
             <table>
-                <thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Date</th></tr></thead>
+                <thead><tr><th>Title</th><th>Status</th><th>Date</th><th></th></tr></thead>
                 <tbody>
                 {% for h in history %}
                 <tr>
-                    <td>#{{ h.id }}</td>
-                    <td>{{ h.generated_title[:50] }}{% if h.generated_title|length > 50 %}...{% endif %}</td>
+                    <td>{{ h.generated_title[:40] }}{% if h.generated_title|length > 40 %}...{% endif %}</td>
                     <td><span class="status s-{{ h.status }}">{{ h.status }}</span></td>
-                    <td>{{ h.created_at[:19] }}</td>
+                    <td style="font-size:11px;color:#8b8fa3">{{ h.created_at[:16] }}</td>
+                    <td><form action="/delete/{{ h.id }}" method="post" class="inline"><button class="img-btn" onclick="return confirm('Delete?')">🗑️</button></form></td>
                 </tr>
                 {% endfor %}
                 </tbody>
             </table>
             {% else %}
-            <div class="empty"><div class="icon">📊</div><p>No posting history yet.</p></div>
+            <div class="empty">📊 No history yet.</div>
             {% endif %}
         </div>
     </div>
-
     <script>
     function showLoading(){document.getElementById('loading').classList.add('active')}
     function setTopic(t){document.querySelector('input[name=topics]').value=t}
