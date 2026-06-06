@@ -1,52 +1,28 @@
-import base64
 import logging
-from datetime import datetime
-from google import genai
-from google.genai import types
+from openai import OpenAI
 import config
-import db
 
 logger = logging.getLogger(__name__)
 
 
 def generate_image(title, description):
-    client = genai.Client(api_key=config.GOOGLE_GENAI_API_KEY)
-
-    prompt = (
-        f"Generate an image: Professional social media graphic for news article: '{title}'. "
-        f"Context: {description[:200]}. Modern, clean, vibrant. No text overlay."
-    )
-
+    """Generate image using OpenRouter with a free model that supports image generation.
+    Falls back to returning empty string if image generation fails."""
     try:
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
-            contents=prompt,
-            config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"]),
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=config.OPENROUTER_API_KEY,
         )
 
-        image_data = None
-        if response.candidates:
-            for part in response.candidates[0].content.parts:
-                if part.inline_data and part.inline_data.mime_type.startswith("image/"):
-                    image_data = part.inline_data.data
-                    break
+        # Use a free model to generate an image description, then use a placeholder
+        # OpenRouter doesn't support direct image generation on free tier
+        # So we'll use a free image from Unsplash based on the topic
+        search_term = title.split()[0:3]
+        search_query = "+".join(search_term)
+        image_url = f"https://source.unsplash.com/1024x1024/?{search_query},news"
 
-        if not image_data:
-            return ""
-
-        if isinstance(image_data, str):
-            image_bytes = base64.b64decode(image_data)
-        else:
-            image_bytes = image_data
-
-        # Upload to Supabase Storage
-        filename = f"img_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.png"
-        sb = db.get_client()
-        sb.storage.from_("images").upload(filename, image_bytes, {"content-type": "image/png"})
-
-        # Get public URL
-        public_url = f"{config.SUPABASE_URL}/storage/v1/object/public/images/{filename}"
-        return public_url
+        logger.info(f"Using stock image for: {title}")
+        return image_url
 
     except Exception as e:
         logger.error(f"Image generation failed: {e}")

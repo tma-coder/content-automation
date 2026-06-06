@@ -1,8 +1,7 @@
 import json
 import logging
 from dataclasses import dataclass
-from google import genai
-from google.genai import types
+from openai import OpenAI
 import config
 
 logger = logging.getLogger(__name__)
@@ -29,7 +28,10 @@ Respond with valid JSON only, no markdown fences:
 
 
 def generate_article(news_title, news_summary, news_link):
-    client = genai.Client(api_key=config.GOOGLE_GENAI_API_KEY)
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=config.OPENROUTER_API_KEY,
+    )
 
     prompt = f"""Create social media content based on this news:
 Title: {news_title}
@@ -38,13 +40,17 @@ Source: {news_link}
 
 Write original content. Return valid JSON only."""
 
-    response = client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT, temperature=0.8, max_output_tokens=1500),
+    response = client.chat.completions.create(
+        model="google/gemini-2.0-flash-exp:free",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.8,
+        max_tokens=1500,
     )
 
-    text = response.text.strip()
+    text = response.choices[0].message.content.strip()
     if text.startswith("```"):
         lines = [l for l in text.split("\n") if not l.strip().startswith("```")]
         text = "\n".join(lines)
