@@ -217,30 +217,41 @@ async def test_image(
         elif url.startswith("data:image/svg"):
             source = "⚠️ SVG placeholder (all generation failed)"
 
+        # Get debug info
+        from core.image_generator import get_debug
+        debug = get_debug()
+        debug_html = "<br>".join([f"<b>{k}:</b> {v}" for k, v in debug.items()])
+
         html = f"""
         <!DOCTYPE html><html><head><title>Image Test</title>
         <style>body{{background:#0f1117;color:#e1e4e8;font-family:sans-serif;padding:20px;max-width:900px;margin:0 auto}}
         img{{max-width:800px;border:1px solid #2d3148;border-radius:8px;margin-top:20px;display:block}}
-        code{{background:#1e2030;padding:8px;border-radius:4px;font-size:12px;display:block;word-break:break-all;margin:8px 0}}
-        a{{color:#667eea}} .info{{background:#1e2030;padding:12px;border-radius:8px;margin:12px 0}}
+        code{{background:#1e2030;padding:8px;border-radius:4px;font-size:11px;display:block;word-break:break-all;margin:8px 0}}
+        a{{color:#667eea}} .info{{background:#1e2030;padding:12px;border-radius:8px;margin:12px 0;font-size:13px}}
+        .debug{{background:#0d1019;padding:12px;border-radius:8px;margin:12px 0;font-size:11px;font-family:monospace;line-height:1.7;color:#fbbf24}}
         .ok{{color:#34d399}}.warn{{color:#fbbf24}}.err{{color:#f87171}}</style></head><body>
         <h2>🖼️ Image Generation Test</h2>
         <div class="info">
         <p><b>Title:</b> {title}</p>
+        <p><b>Subject:</b> {subject}</p>
+        <p><b>Highlights:</b> {highlight_list}</p>
         <p><b>Source:</b> {source}</p>
-        <p><b>Generation time:</b> {elapsed:.2f}s</p>
-        <p><b>Generated URL:</b><code>{url}</code></p>
-        <p><a href="{url}" target="_blank">→ Open URL directly</a></p>
+        <p><b>Time:</b> {elapsed:.2f}s</p>
         </div>
+        <div class="debug">
+        <b style="color:#667eea">🔍 DEBUG INFO:</b><br>
+        {debug_html}
+        </div>
+        <p><b>URL:</b><code>{url}</code></p>
+        <p><a href="{url}" target="_blank">→ Open URL directly</a></p>
         <p>Image preview:</p>
         <img src="{url}" onerror="this.style.display='none';document.getElementById('err').style.display='block'">
-        <div id="err" style="display:none;color:#f87171;margin-top:20px">⚠️ Image failed to load in browser</div>
+        <div id="err" style="display:none;color:#f87171;margin-top:20px">⚠️ Image failed to load</div>
         <hr style="margin:30px 0;border-color:#2d3148">
         <p>Quick tests:
-        <a href="/test-image?title=Bitcoin price surges to all time high">Bitcoin</a> |
-        <a href="/test-image?title=SpaceX launches rocket to Mars">SpaceX</a> |
-        <a href="/test-image?title=Election results announced">Election</a> |
-        <a href="/test-image?title=AI breakthrough in medicine">AI Medicine</a></p>
+        <a href="/test-image?title=Bitcoin price surges to all time high&highlights=Bitcoin">Bitcoin</a> |
+        <a href="/test-image?title=SpaceX launches Starship to Mars: Elon Musk&highlights=SpaceX|Elon Musk">SpaceX</a> |
+        <a href="/test-image?title=Election results stun nation: Major upset&highlights=Election results|Major upset">Election</a></p>
         </body></html>
         """
         return HTMLResponse(html)
