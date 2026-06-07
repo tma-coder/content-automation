@@ -90,46 +90,93 @@ def regenerate_image(title, subject="", highlight_phrases=None):
 def _generate_background(title, subject=""):
     api_key = config.OPENROUTER_IMAGE_API_KEY or config.OPENROUTER_API_KEY
     if not api_key:
+        _LAST_DEBUG["bg_error"] = "no API key"
         return None
 
-    visual_subject = subject or _clean(title)[:80]
+    visual_subject = subject.strip() if subject else _smart_subject(title)
+    _LAST_DEBUG["visual_subject"] = visual_subject
 
-    prompt = (
-        f"Generate a high-quality photographic news cover image. "
-        f"Subject: {visual_subject}. "
-        f"Style: Professional news photography, cinematic lighting, sharp focus, vibrant. "
-        f"Composition: Subject prominently in the upper portion of the frame. "
-        f"Aspect ratio: portrait. "
-        f"CRITICAL: NO text, NO captions, NO logos. Just a clean photograph."
-    )
+    # Try multiple prompt variations
+    prompts = [
+        # Detailed photographic prompt
+        (
+            f"Generate a high-quality photographic image for a news article. "
+            f"Show: {visual_subject}. "
+            f"Style: Professional news photography, cinematic lighting, sharp focus, vibrant colors, photorealistic. "
+            f"Composition: Main subject prominently in the upper-center area, with empty space at the bottom for text. "
+            f"Aspect ratio: portrait (taller than wide). "
+            f"DO NOT include any text, captions, watermarks, or logos in the image."
+        ),
+        # Simpler prompt
+        (
+            f"Create a photorealistic news image showing: {visual_subject}. "
+            f"Portrait orientation. No text overlay. Professional photography style."
+        ),
+        # Even simpler
+        f"Photograph of {visual_subject}",
+    ]
+
+    model_errors = []
 
     for model in IMAGE_MODELS:
-        try:
-            resp = httpx.post(
-                OPENROUTER_API,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://content-automation-chi.vercel.app",
-                    "X-Title": "Content Automation",
-                },
-                json={
-                    "model": model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "modalities": ["image", "text"],
-                    "max_tokens": 2000,
-                },
-                timeout=40,
-            )
-            if resp.status_code != 200:
-                continue
-            image_bytes = _extract_image(resp.json())
-            if image_bytes:
-                _LAST_DEBUG["bg_model"] = model
-                return image_bytes
-        except Exception as e:
-            logger.warning(f"{model}: {e}")
+        for pi, prompt in enumerate(prompts):
+            try:
+                resp = httpx.post(
+                    OPENROUTER_API,
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://content-automation-chi.vercel.app",
+                        "X-Title": "Content Automation",
+                    },
+                    json={
+                        "model": model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "modalities": ["image", "text"],
+                        "max_tokens": 2000,
+                    },
+                    timeout=40,
+                )
+                if resp.status_code != 200:
+                    err_short = resp.text[:200] if resp.text else f"HTTP {resp.status_code}"
+                    model_errors.append(f"{model}[p{pi}]: {resp.status_code} - {err_short[:80]}")
+                    continue
+
+                image_bytes = _extract_image(resp.json())
+                if image_bytes:
+                    _LAST_DEBUG["bg_model"] = model
+                    _LAST_DEBUG["bg_prompt_idx"] = pi
+                    return image_bytes
+                else:
+                    model_errors.append(f"{model}[p{pi}]: no image in response")
+            except httpx.TimeoutException:
+                model_errors.append(f"{model}[p{pi}]: timeout")
+            except Exception as e:
+                model_errors.append(f"{model}[p{pi}]: {str(e)[:80]}")
+
+    _LAST_DEBUG["model_errors"] = model_errors[:6]  # show first 6 errors
     return None
+
+
+def _smart_subject(title):
+    """Extract a visual subject from a title."""
+    # Clean and shorten
+    clean = _clean(title)[:120]
+
+    # If title contains a colon, take the part before it (usually the topic)
+    if ":" in clean:
+        before_colon = clean.split(":")[0].strip()
+        after_colon = clean.split(":", 1)[1].strip()
+        # If there's a name after colon (capitalized words), include it
+        if after_colon and after_colon[0].isupper():
+            return f"{before_colon}, featuring {after_colon}"
+        return before_colon
+
+    # Remove common stop phrases
+    for phrase in ["is here", "is now", "are here", "has arrived", "is launching"]:
+        clean = clean.replace(phrase, "")
+
+    return clean.strip()
 
 
 def _extract_image(data):

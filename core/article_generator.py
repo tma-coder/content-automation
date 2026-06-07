@@ -33,15 +33,23 @@ SYSTEM_PROMPT = """You are a professional social media content writer. Given a n
 create engaging, original content. Do NOT copy the source.
 
 You MUST respond with ONLY valid JSON, no markdown, no explanation, no fences.
+
 Format:
 {
     "title": "Catchy headline (max 120 chars). Can be a quote or statement.",
     "short_text": "Concise post (max 280 chars). Include a call to action.",
     "long_text": "Detailed post (300-500 words). Include analysis and unique perspective.",
     "hashtags": "#tag1 #tag2 #tag3 (5-10 relevant hashtags)",
-    "subject": "Visual subject for the cover photo (e.g. 'businessman speaking at podium', 'crypto trader at computer screens', 'rocket launching')",
+    "subject": "REQUIRED. A specific, photographable VISUAL subject — physical people, places, objects, or scenes. Be concrete and visual, NOT abstract. Examples: 'humanoid robot working at desk with multiple monitors showing code', 'businessman in suit shaking hands at corporate office', 'bitcoin coins falling on stock chart background', 'astronaut planting flag on Mars surface', 'religious scholar speaking at podium with audience'. NEVER use abstract terms like 'AI era' or 'technology future' — always describe a real photographable scene with concrete subjects.",
     "highlight_phrases": ["2-3 key phrases from the title to highlight (each 2-6 words)"]
-}"""
+}
+
+IMPORTANT for subject field:
+- Must be a CONCRETE visual scene that can be photographed
+- Include physical objects, people, or environments
+- Example BAD: "AI revolution"
+- Example GOOD: "humanoid AI robot standing next to human in modern tech office"
+- For person-focused news: include the person if named (e.g., "Elon Musk at SpaceX rocket launch")"""
 
 
 def _extract_json(text):
