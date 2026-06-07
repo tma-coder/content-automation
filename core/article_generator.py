@@ -25,6 +25,8 @@ class GeneratedArticle:
     short_text: str
     long_text: str
     hashtags: str
+    subject: str = ""
+    highlight_phrases: list = None
 
 
 SYSTEM_PROMPT = """You are a professional social media content writer. Given a news story,
@@ -33,10 +35,12 @@ create engaging, original content. Do NOT copy the source.
 You MUST respond with ONLY valid JSON, no markdown, no explanation, no fences.
 Format:
 {
-    "title": "Catchy headline (max 100 chars)",
+    "title": "Catchy headline (max 120 chars). Can be a quote or statement.",
     "short_text": "Concise post (max 280 chars). Include a call to action.",
     "long_text": "Detailed post (300-500 words). Include analysis and unique perspective.",
-    "hashtags": "#tag1 #tag2 #tag3 (5-10 relevant hashtags)"
+    "hashtags": "#tag1 #tag2 #tag3 (5-10 relevant hashtags)",
+    "subject": "Visual subject for the cover photo (e.g. 'businessman speaking at podium', 'crypto trader at computer screens', 'rocket launching')",
+    "highlight_phrases": ["2-3 key phrases from the title to highlight (each 2-6 words)"]
 }"""
 
 
@@ -130,12 +134,19 @@ Write original content. Return ONLY valid JSON, nothing else."""
                 logger.warning(f"{model}: missing both short_text and long_text")
                 continue
 
+            subject = data.get("subject") or ""
+            highlights = data.get("highlight_phrases") or []
+            if not isinstance(highlights, list):
+                highlights = []
+
             logger.info(f"Article generated successfully with: {model}")
             return GeneratedArticle(
                 title=str(title)[:200],
                 short_text=str(short_text)[:500],
                 long_text=str(long_text)[:3000],
                 hashtags=str(hashtags)[:500],
+                subject=str(subject)[:200],
+                highlight_phrases=[str(h)[:80] for h in highlights[:4]],
             )
 
         except Exception as e:

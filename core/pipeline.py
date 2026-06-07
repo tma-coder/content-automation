@@ -24,7 +24,12 @@ def process_news_item(item, auto_approve=False):
 
     # Generate image (always returns something, even fallback)
     try:
-        image_url = generate_image(article.title, article.short_text)
+        image_url = generate_image(
+            article.title,
+            article.short_text,
+            subject=article.subject or "",
+            highlight_phrases=article.highlight_phrases or [],
+        )
     except Exception as e:
         logger.error(f"Image generation failed: {e}")
         image_url = ""

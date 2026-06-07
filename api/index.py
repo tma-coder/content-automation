@@ -115,7 +115,22 @@ async def regenerate_image_route(article_id: int):
         article = db.get_article(article_id)
         if not article:
             return JSONResponse({"error": "Article not found"}, status_code=404)
-        new_url = await asyncio.to_thread(regenerate_image, article["generated_title"])
+
+        # Extract highlight phrases from title (3-5 word chunks from beginning)
+        title = article["generated_title"]
+        words = title.split()
+        phrases = []
+        if len(words) >= 4:
+            phrases.append(" ".join(words[:4]))
+        if ":" in title:
+            after_colon = title.split(":", 1)[1].strip()
+            if after_colon:
+                phrases.append(after_colon)
+
+        new_url = await asyncio.to_thread(
+            regenerate_image, title,
+            subject="", highlight_phrases=phrases
+        )
         if new_url:
             db.update_image(article_id, new_url)
     except Exception as e:
@@ -177,24 +192,30 @@ async def health():
 
 
 @app.get("/test-image")
-async def test_image(title: str = "Latest AI breakthrough in technology"):
-    """Test image generation. Visit /test-image?title=YourTitle"""
+async def test_image(
+    title: str = "Mufti Speaks at Major Conference",
+    subject: str = "religious scholar at podium with audience",
+    highlights: str = "Mufti Speaks",
+):
+    """Test image generation. /test-image?title=...&subject=...&highlights=phrase1|phrase2"""
     try:
         from core.image_generator import generate_image
         import time as t
 
+        highlight_list = [h.strip() for h in highlights.split("|") if h.strip()]
+
         start = t.time()
-        url = await asyncio.to_thread(generate_image, title)
+        url = await asyncio.to_thread(generate_image, title, "", subject, highlight_list)
         elapsed = t.time() - start
 
         # Detect source
         source = "Unknown"
-        if "supabase.co/storage" in url:
-            source = "✅ OpenRouter → Supabase Storage (cached)"
+        if "supabase.co/storage" in url and "card_" in url:
+            source = "✅ AI Background + PIL Text Composition → Supabase"
+        elif "supabase.co/storage" in url:
+            source = "✅ OpenRouter → Supabase Storage"
         elif url.startswith("data:image/svg"):
-            source = "⚠️ SVG placeholder (all OpenRouter models failed)"
-        elif "picsum" in url:
-            source = "⚠️ Picsum fallback"
+            source = "⚠️ SVG placeholder (all generation failed)"
 
         html = f"""
         <!DOCTYPE html><html><head><title>Image Test</title>
