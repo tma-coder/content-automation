@@ -21,9 +21,16 @@ IMAGE_MODELS = [
 ]
 
 FONT_URLS = [
+    # jsDelivr CDN — most reliable, no redirects
+    "https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.16/files/inter-latin-800-normal.woff2",
+    "https://cdn.jsdelivr.net/gh/rsms/inter@master/docs/font-files/Inter-Bold.ttf",
+    "https://cdn.jsdelivr.net/gh/rsms/inter@v4.0/docs/font-files/Inter-Bold.ttf",
+    # GitHub raw
     "https://raw.githubusercontent.com/rsms/inter/master/docs/font-files/Inter-Bold.ttf",
-    "https://cdn.jsdelivr.net/gh/google/fonts/ofl/inter/static/Inter_28pt-Bold.ttf",
-    "https://cdn.jsdelivr.net/gh/google/fonts/apache/roboto/static/Roboto-Bold.ttf",
+    # Google Fonts mirror via jsDelivr (different paths)
+    "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/montserrat/static/Montserrat-Black.ttf",
+    "https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/static/Roboto-Black.ttf",
+    "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bebasneue/BebasNeue-Regular.ttf",
 ]
 
 _FONT_BYTES = None
