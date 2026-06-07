@@ -11,13 +11,10 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions"
 
-# Models in priority order — start with paid known-working ones
+# Models in priority order — only ones that actually exist
 IMAGE_MODELS = [
     "google/gemini-2.5-flash-image",
-    "google/gemini-2.5-flash-image-preview",
     "google/gemini-3.1-flash-image-preview",
-    "google/gemini-2.5-flash-image:free",
-    "google/gemini-2.5-flash-image-preview:free",
 ]
 
 FONT_URLS = [
@@ -142,9 +139,9 @@ def _try_openrouter(visual_subject):
                     "model": model,
                     "messages": [{"role": "user", "content": prompt}],
                     "modalities": ["image", "text"],
-                    "max_tokens": 2000,
+                    "max_tokens": 100,
                 },
-                timeout=20,
+                timeout=25,
             )
             if resp.status_code != 200:
                 err_text = resp.text[:120] if resp.text else f"HTTP {resp.status_code}"
@@ -168,36 +165,38 @@ def _try_openrouter(visual_subject):
 
 
 def _try_pollinations(visual_subject):
-    """Server-side fetch from Pollinations with Bearer auth."""
-    try:
-        import urllib.parse
-        prompt = f"{visual_subject}, professional photography, photorealistic, cinematic"
-        encoded = urllib.parse.quote(prompt, safe='')
-        seed = int(hashlib.md5(visual_subject.encode()).hexdigest()[:8], 16) % 1000000
-        url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1280&seed={seed}&model=flux&nologo=true"
+    """Server-side fetch from Pollinations - tries multiple auth methods."""
+    import urllib.parse
+    prompt = f"{visual_subject}, professional photography, photorealistic, cinematic"
+    encoded = urllib.parse.quote(prompt, safe='')
+    seed = int(hashlib.md5(visual_subject.encode()).hexdigest()[:8], 16) % 1000000
+    base_url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1280&seed={seed}&model=flux&nologo=true"
 
-        logger.info("Trying Pollinations fallback")
-        resp = httpx.get(
-            url,
-            headers={
-                "Authorization": f"Bearer {config.POLLINATIONS_API_KEY}",
-                "User-Agent": "Mozilla/5.0 ContentAutomation",
-            },
-            timeout=25,
-            follow_redirects=True,
-        )
+    # Try different auth methods
+    attempts = [
+        {"desc": "Bearer header", "url": base_url, "headers": {"Authorization": f"Bearer {config.POLLINATIONS_API_KEY}"}},
+        {"desc": "x-api-key", "url": base_url, "headers": {"x-api-key": config.POLLINATIONS_API_KEY}},
+        {"desc": "token query", "url": f"{base_url}&token={config.POLLINATIONS_API_KEY}", "headers": {}},
+        {"desc": "key query", "url": f"{base_url}&key={config.POLLINATIONS_API_KEY}", "headers": {}},
+    ]
 
-        content_type = resp.headers.get("content-type", "")
-        _LAST_DEBUG["pollinations_status"] = f"HTTP {resp.status_code}, type={content_type}, bytes={len(resp.content)}"
+    results = []
+    for attempt in attempts:
+        try:
+            headers = {"User-Agent": "Mozilla/5.0 ContentAutomation", **attempt["headers"]}
+            resp = httpx.get(attempt["url"], headers=headers, timeout=20, follow_redirects=True)
+            ct = resp.headers.get("content-type", "")
+            results.append(f"{attempt['desc']}: HTTP {resp.status_code}, type={ct}, bytes={len(resp.content)}")
 
-        if resp.status_code == 200 and content_type.startswith("image/") and resp.content:
-            _LAST_DEBUG["bg_source"] = "Pollinations"
-            return resp.content
+            if resp.status_code == 200 and ct.startswith("image/") and resp.content:
+                _LAST_DEBUG["bg_source"] = f"Pollinations ({attempt['desc']})"
+                _LAST_DEBUG["pollinations_status"] = " | ".join(results)
+                return resp.content
+        except Exception as e:
+            results.append(f"{attempt['desc']}: error {str(e)[:60]}")
 
-        return None
-    except Exception as e:
-        _LAST_DEBUG["pollinations_error"] = str(e)[:120]
-        return None
+    _LAST_DEBUG["pollinations_status"] = " | ".join(results)
+    return None
 
 
 def _smart_subject(title):
