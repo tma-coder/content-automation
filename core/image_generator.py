@@ -11,13 +11,13 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions"
 
+# Models in priority order — start with paid known-working ones
 IMAGE_MODELS = [
-    "google/gemini-2.5-flash-image:free",
-    "google/gemini-2.5-flash-image-preview:free",
-    "google/gemini-3.1-flash-image-preview:free",
     "google/gemini-2.5-flash-image",
     "google/gemini-2.5-flash-image-preview",
     "google/gemini-3.1-flash-image-preview",
+    "google/gemini-2.5-flash-image:free",
+    "google/gemini-2.5-flash-image-preview:free",
 ]
 
 FONT_URLS = [
@@ -88,74 +88,116 @@ def regenerate_image(title, subject="", highlight_phrases=None):
 
 
 def _generate_background(title, subject=""):
-    api_key = config.OPENROUTER_IMAGE_API_KEY or config.OPENROUTER_API_KEY
-    if not api_key:
-        _LAST_DEBUG["bg_error"] = "no API key"
-        return None
-
+    """Try OpenRouter first, fall back to Pollinations if available."""
     visual_subject = subject.strip() if subject else _smart_subject(title)
     _LAST_DEBUG["visual_subject"] = visual_subject
 
-    # Try multiple prompt variations
-    prompts = [
-        # Detailed photographic prompt
-        (
-            f"Generate a high-quality photographic image for a news article. "
-            f"Show: {visual_subject}. "
-            f"Style: Professional news photography, cinematic lighting, sharp focus, vibrant colors, photorealistic. "
-            f"Composition: Main subject prominently in the upper-center area, with empty space at the bottom for text. "
-            f"Aspect ratio: portrait (taller than wide). "
-            f"DO NOT include any text, captions, watermarks, or logos in the image."
-        ),
-        # Simpler prompt
-        (
-            f"Create a photorealistic news image showing: {visual_subject}. "
-            f"Portrait orientation. No text overlay. Professional photography style."
-        ),
-        # Even simpler
-        f"Photograph of {visual_subject}",
-    ]
+    # Try OpenRouter
+    bg = _try_openrouter(visual_subject)
+    if bg:
+        return bg
+
+    # Fall back to Pollinations server-side
+    if config.POLLINATIONS_API_KEY:
+        bg = _try_pollinations(visual_subject)
+        if bg:
+            return bg
+
+    return None
+
+
+def _try_openrouter(visual_subject):
+    """Try OpenRouter image models. Time-budget aware (max ~30s total)."""
+    api_key = config.OPENROUTER_IMAGE_API_KEY or config.OPENROUTER_API_KEY
+    if not api_key:
+        _LAST_DEBUG["openrouter_error"] = "no API key"
+        return None
+
+    prompt = (
+        f"Generate a high-quality photographic news cover image showing: {visual_subject}. "
+        f"Style: Professional photography, cinematic lighting, sharp focus, vibrant colors. "
+        f"Portrait orientation. The subject should be prominent in the upper-center. "
+        f"DO NOT add any text, captions, watermarks, or logos."
+    )
 
     model_errors = []
+    start_time = time.time()
 
     for model in IMAGE_MODELS:
-        for pi, prompt in enumerate(prompts):
-            try:
-                resp = httpx.post(
-                    OPENROUTER_API,
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": "https://content-automation-chi.vercel.app",
-                        "X-Title": "Content Automation",
-                    },
-                    json={
-                        "model": model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "modalities": ["image", "text"],
-                        "max_tokens": 2000,
-                    },
-                    timeout=40,
-                )
-                if resp.status_code != 200:
-                    err_short = resp.text[:200] if resp.text else f"HTTP {resp.status_code}"
-                    model_errors.append(f"{model}[p{pi}]: {resp.status_code} - {err_short[:80]}")
-                    continue
+        # Time budget: leave 25s for Pollinations fallback + composition
+        if time.time() - start_time > 30:
+            model_errors.append(f"time budget exceeded after {model}")
+            break
 
-                image_bytes = _extract_image(resp.json())
-                if image_bytes:
-                    _LAST_DEBUG["bg_model"] = model
-                    _LAST_DEBUG["bg_prompt_idx"] = pi
-                    return image_bytes
-                else:
-                    model_errors.append(f"{model}[p{pi}]: no image in response")
-            except httpx.TimeoutException:
-                model_errors.append(f"{model}[p{pi}]: timeout")
-            except Exception as e:
-                model_errors.append(f"{model}[p{pi}]: {str(e)[:80]}")
+        try:
+            resp = httpx.post(
+                OPENROUTER_API,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://content-automation-chi.vercel.app",
+                    "X-Title": "Content Automation",
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "modalities": ["image", "text"],
+                    "max_tokens": 2000,
+                },
+                timeout=20,
+            )
+            if resp.status_code != 200:
+                err_text = resp.text[:120] if resp.text else f"HTTP {resp.status_code}"
+                model_errors.append(f"{model}: {resp.status_code} - {err_text}")
+                continue
 
-    _LAST_DEBUG["model_errors"] = model_errors[:6]  # show first 6 errors
+            image_bytes = _extract_image(resp.json())
+            if image_bytes:
+                _LAST_DEBUG["bg_model"] = model
+                _LAST_DEBUG["bg_source"] = "OpenRouter"
+                return image_bytes
+            else:
+                model_errors.append(f"{model}: no image in response")
+        except httpx.TimeoutException:
+            model_errors.append(f"{model}: timeout")
+        except Exception as e:
+            model_errors.append(f"{model}: {str(e)[:80]}")
+
+    _LAST_DEBUG["openrouter_errors"] = model_errors
     return None
+
+
+def _try_pollinations(visual_subject):
+    """Server-side fetch from Pollinations with Bearer auth."""
+    try:
+        import urllib.parse
+        prompt = f"{visual_subject}, professional photography, photorealistic, cinematic"
+        encoded = urllib.parse.quote(prompt, safe='')
+        seed = int(hashlib.md5(visual_subject.encode()).hexdigest()[:8], 16) % 1000000
+        url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1280&seed={seed}&model=flux&nologo=true"
+
+        logger.info("Trying Pollinations fallback")
+        resp = httpx.get(
+            url,
+            headers={
+                "Authorization": f"Bearer {config.POLLINATIONS_API_KEY}",
+                "User-Agent": "Mozilla/5.0 ContentAutomation",
+            },
+            timeout=25,
+            follow_redirects=True,
+        )
+
+        content_type = resp.headers.get("content-type", "")
+        _LAST_DEBUG["pollinations_status"] = f"HTTP {resp.status_code}, type={content_type}, bytes={len(resp.content)}"
+
+        if resp.status_code == 200 and content_type.startswith("image/") and resp.content:
+            _LAST_DEBUG["bg_source"] = "Pollinations"
+            return resp.content
+
+        return None
+    except Exception as e:
+        _LAST_DEBUG["pollinations_error"] = str(e)[:120]
+        return None
 
 
 def _smart_subject(title):
