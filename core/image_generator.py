@@ -1,133 +1,206 @@
 import logging
-import urllib.parse
 import hashlib
 import time
+import base64
+import re
 import httpx
 import config
 
 logger = logging.getLogger(__name__)
 
-POLLINATIONS_BASE = "https://image.pollinations.ai/prompt"
+OPENROUTER_API = "https://openrouter.ai/api/v1/chat/completions"
+
+# OpenRouter image-capable models — tries in order
+IMAGE_MODELS = [
+    "google/gemini-2.5-flash-image:free",
+    "google/gemini-2.5-flash-image-preview:free",
+    "google/gemini-3.1-flash-image-preview:free",
+    "google/gemini-2.5-flash-image",
+    "google/gemini-2.5-flash-image-preview",
+    "google/gemini-3.1-flash-image-preview",
+]
 
 
 def generate_image(title, description=""):
-    """Generate image. Tries Pollinations (server-side with auth) → upload to Supabase → fallback to Picsum."""
+    """Generate image via OpenRouter, upload to Supabase, return public URL."""
     if not title:
-        title = "news"
+        title = "news article"
 
-    # Try Pollinations server-side with Bearer auth
-    if config.POLLINATIONS_API_KEY:
-        url = _pollinations_authenticated(title)
-        if url:
-            return url
-
-    # Fallback: try without auth (might work if not rate-limited)
-    url = _pollinations_no_auth(title)
+    url = _openrouter_generate(title)
     if url:
         return url
 
-    # Guaranteed fallback
-    logger.info("Using Picsum fallback")
-    return _picsum_fallback(title)
+    # If all OpenRouter models fail, return SVG placeholder
+    return _svg_placeholder(title)
 
 
 def regenerate_image(title):
-    """Regenerate with different seed."""
+    """Regenerate with creative variant."""
     if not title:
-        title = "news"
+        title = "news article"
 
-    seed = int(time.time())
-
-    if config.POLLINATIONS_API_KEY:
-        url = _pollinations_authenticated(title, seed=seed, variant=True)
-        if url:
-            return url
-
-    url = _pollinations_no_auth(title, seed=seed, variant=True)
+    url = _openrouter_generate(title, variant=True)
     if url:
         return url
 
-    return _picsum_fallback(f"{title}-{seed}")
+    return _svg_placeholder(title)
 
 
-def _build_prompt(title, variant=False):
+def _openrouter_generate(title, variant=False):
+    """Try each OpenRouter image model in sequence."""
+    api_key = config.OPENROUTER_IMAGE_API_KEY or config.OPENROUTER_API_KEY
+    if not api_key:
+        logger.error("No OpenRouter API key configured")
+        return ""
+
     short = _clean(title)
     if variant:
-        return f"{short}, creative news illustration, dramatic lighting, digital art"
-    return f"{short}, professional news article cover photo, modern design, vibrant colors, no text"
+        prompt = f"Generate a creative, dramatic news article cover image about: {short}. Modern digital art, vibrant colors, no text overlay."
+    else:
+        prompt = f"Generate a professional news article cover image about: {short}. Clean modern design, vibrant colors, no text overlay."
+
+    for model in IMAGE_MODELS:
+        try:
+            logger.info(f"Trying image model: {model}")
+
+            resp = httpx.post(
+                OPENROUTER_API,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://content-automation-chi.vercel.app",
+                    "X-Title": "Content Automation",
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "modalities": ["image", "text"],
+                    "max_tokens": 2000,
+                },
+                timeout=45,
+            )
+
+            if resp.status_code != 200:
+                logger.warning(f"{model}: HTTP {resp.status_code} - {resp.text[:200]}")
+                continue
+
+            data = resp.json()
+            image_bytes = _extract_image(data)
+            if not image_bytes:
+                logger.warning(f"{model}: no image in response")
+                continue
+
+            url = _upload_to_supabase(image_bytes, title)
+            if url:
+                logger.info(f"✅ Image generated via {model}")
+                return url
+
+        except httpx.TimeoutException:
+            logger.warning(f"{model}: timeout")
+            continue
+        except Exception as e:
+            logger.warning(f"{model} error: {e}")
+            continue
+
+    logger.error("All OpenRouter image models failed")
+    return ""
 
 
-def _pollinations_authenticated(title, seed=None, variant=False):
-    """Server-side fetch from Pollinations with Bearer auth, upload to Supabase."""
+def _extract_image(data):
+    """Extract image bytes from various possible OpenRouter response formats."""
     try:
-        prompt = _build_prompt(title, variant)
-        encoded = urllib.parse.quote(prompt, safe='')
+        choices = data.get("choices", [])
+        if not choices:
+            return None
 
-        if seed is None:
-            seed = int(hashlib.md5(title.encode()).hexdigest()[:8], 16) % 1000000
+        message = choices[0].get("message", {})
 
-        url = f"{POLLINATIONS_BASE}/{encoded}?width=800&height=450&seed={seed}&model=flux&nologo=true"
+        # Format 1: images array at top level of message
+        images = message.get("images")
+        if isinstance(images, list) and images:
+            for img in images:
+                if isinstance(img, dict):
+                    url = img.get("image_url", {}).get("url") if isinstance(img.get("image_url"), dict) else img.get("image_url")
+                    if isinstance(url, str):
+                        bytes_data = _decode_data_url(url)
+                        if bytes_data:
+                            return bytes_data
 
-        logger.info(f"Fetching from Pollinations: {url[:120]}")
+        # Format 2: content is a list of parts (multimodal)
+        content = message.get("content")
+        if isinstance(content, list):
+            for part in content:
+                if not isinstance(part, dict):
+                    continue
+                ptype = part.get("type", "")
 
-        resp = httpx.get(
-            url,
-            headers={
-                "Authorization": f"Bearer {config.POLLINATIONS_API_KEY}",
-                "User-Agent": "Mozilla/5.0 ContentAutomation/1.0",
-            },
-            timeout=25,
-            follow_redirects=True,
-        )
+                # image_url type
+                if ptype == "image_url":
+                    img_url = part.get("image_url")
+                    url = img_url.get("url") if isinstance(img_url, dict) else img_url
+                    if isinstance(url, str):
+                        bytes_data = _decode_data_url(url)
+                        if bytes_data:
+                            return bytes_data
 
-        content_type = resp.headers.get("content-type", "")
-        logger.info(f"Pollinations response: HTTP {resp.status_code}, type={content_type}, bytes={len(resp.content) if resp.content else 0}")
+                # image type with data field
+                if ptype == "image" and part.get("data"):
+                    try:
+                        return base64.b64decode(part["data"])
+                    except Exception:
+                        pass
 
-        if resp.status_code == 200 and content_type.startswith("image/") and resp.content:
-            return _upload_to_supabase(resp.content, title, content_type)
+                # inline_data style
+                inline = part.get("inline_data") or part.get("inlineData")
+                if isinstance(inline, dict) and inline.get("data"):
+                    try:
+                        return base64.b64decode(inline["data"])
+                    except Exception:
+                        pass
 
-        if resp.status_code == 402:
-            logger.warning("Pollinations: rate limit hit (402)")
-        else:
-            logger.warning(f"Pollinations: unexpected response {resp.status_code}")
+        # Format 3: content is a string with embedded data URL
+        if isinstance(content, str) and "data:image" in content:
+            match = re.search(r"data:image/[^;]+;base64,([A-Za-z0-9+/=]+)", content)
+            if match:
+                try:
+                    return base64.b64decode(match.group(1))
+                except Exception:
+                    pass
 
-        return ""
-
-    except httpx.TimeoutException:
-        logger.warning("Pollinations: timeout")
-        return ""
+        return None
     except Exception as e:
-        logger.error(f"Pollinations auth fetch failed: {e}")
-        return ""
+        logger.error(f"Image extraction failed: {e}")
+        return None
 
 
-def _pollinations_no_auth(title, seed=None, variant=False):
-    """Build URL without auth - browser will fetch directly. May hit rate limit."""
+def _decode_data_url(url):
+    """Decode a data:image/...;base64,... URL to bytes."""
     try:
-        prompt = _build_prompt(title, variant)
-        encoded = urllib.parse.quote(prompt, safe='')
-
-        if seed is None:
-            seed = int(hashlib.md5(title.encode()).hexdigest()[:8], 16) % 1000000
-
-        return f"{POLLINATIONS_BASE}/{encoded}?width=800&height=450&seed={seed}&model=flux&nologo=true"
+        if url.startswith("data:image"):
+            match = re.search(r"data:image/[^;]+;base64,([A-Za-z0-9+/=]+)", url)
+            if match:
+                return base64.b64decode(match.group(1))
+        # If it's a regular HTTP URL, fetch it
+        elif url.startswith("http"):
+            resp = httpx.get(url, timeout=15, follow_redirects=True)
+            if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image/"):
+                return resp.content
     except Exception as e:
-        logger.error(f"Pollinations no-auth URL build failed: {e}")
-        return ""
+        logger.warning(f"Decode data URL failed: {e}")
+    return None
 
 
-def _upload_to_supabase(image_bytes, title, content_type="image/png"):
+def _upload_to_supabase(image_bytes, title):
     """Upload image bytes to Supabase Storage, return public URL."""
     try:
         import db
-        ext = "png" if "png" in content_type else "jpg"
-        filename = f"img_{hashlib.md5(title.encode()).hexdigest()[:12]}_{int(time.time())}.{ext}"
+        filename = f"img_{hashlib.md5(title.encode()).hexdigest()[:12]}_{int(time.time())}.png"
 
         client = db.get_client()
         client.storage.from_("images").upload(
             filename,
             image_bytes,
-            {"content-type": content_type, "upsert": "true"},
+            {"content-type": "image/png", "upsert": "true"},
         )
 
         public_url = f"{config.SUPABASE_URL}/storage/v1/object/public/images/{filename}"
@@ -142,13 +215,29 @@ def _clean(title):
     if not title:
         return "news"
     cleaned = title[:80]
-    for ch in ['"', "'", "&", "<", ">", "\n", "\r", "\t", "\\"]:
+    for ch in ['"', "'", "<", ">", "\n", "\r", "\t", "\\"]:
         cleaned = cleaned.replace(ch, " ")
-    cleaned = " ".join(cleaned.split())
-    return cleaned[:80].strip() or "news"
+    return " ".join(cleaned.split())[:80].strip() or "news"
 
 
-def _picsum_fallback(title):
-    """Lorem Picsum - guaranteed instant fallback."""
-    seed = abs(hash(title)) % 1000
-    return f"https://picsum.photos/seed/{seed}/800/450"
+def _svg_placeholder(title):
+    """SVG data URL placeholder - shown when image generation fails. Always works."""
+    short = _clean(title)[:40]
+    # Pick color based on hash for visual variety
+    h = int(hashlib.md5(title.encode()).hexdigest()[:6], 16)
+    hue = h % 360
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="hsl({hue},50%,30%)"/>
+<stop offset="1" stop-color="hsl({(hue+60)%360},50%,20%)"/>
+</linearGradient></defs>
+<rect width="800" height="450" fill="url(#g)"/>
+<text x="400" y="220" font-family="sans-serif" font-size="32" fill="white" text-anchor="middle" font-weight="700">{_xml_escape(short)}</text>
+<text x="400" y="270" font-family="sans-serif" font-size="14" fill="rgba(255,255,255,0.6)" text-anchor="middle">Image generation unavailable</text>
+</svg>'''
+    encoded = base64.b64encode(svg.encode()).decode()
+    return f"data:image/svg+xml;base64,{encoded}"
+
+
+def _xml_escape(s):
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")

@@ -190,11 +190,11 @@ async def test_image(title: str = "Latest AI breakthrough in technology"):
         # Detect source
         source = "Unknown"
         if "supabase.co/storage" in url:
-            source = "✅ Pollinations → Supabase Storage (cached)"
+            source = "✅ OpenRouter → Supabase Storage (cached)"
+        elif url.startswith("data:image/svg"):
+            source = "⚠️ SVG placeholder (all OpenRouter models failed)"
         elif "picsum" in url:
-            source = "⚠️ Picsum fallback (Pollinations failed)"
-        elif "pollinations" in url:
-            source = "⚠️ Pollinations direct (no auth, may hit rate limit)"
+            source = "⚠️ Picsum fallback"
 
         html = f"""
         <!DOCTYPE html><html><head><title>Image Test</title>
