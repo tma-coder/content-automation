@@ -85,21 +85,86 @@ def regenerate_image(title, subject="", highlight_phrases=None):
 
 
 def _generate_background(title, subject=""):
-    """Try OpenRouter first, fall back to Pollinations if available."""
+    """Try multiple providers: OpenRouter → HuggingFace → Pollinations → Unsplash."""
     visual_subject = subject.strip() if subject else _smart_subject(title)
     _LAST_DEBUG["visual_subject"] = visual_subject
 
-    # Try OpenRouter
+    # 1. OpenRouter (paid - needs credits)
     bg = _try_openrouter(visual_subject)
     if bg:
         return bg
 
-    # Fall back to Pollinations server-side
+    # 2. Hugging Face (free with token)
+    if config.HUGGINGFACE_API_KEY:
+        bg = _try_huggingface(visual_subject)
+        if bg:
+            return bg
+
+    # 3. Pollinations
     if config.POLLINATIONS_API_KEY:
         bg = _try_pollinations(visual_subject)
         if bg:
             return bg
 
+    # 4. Unsplash (free random photos by keyword)
+    bg = _try_unsplash(visual_subject)
+    if bg:
+        return bg
+
+    return None
+
+
+def _try_huggingface(visual_subject):
+    """Try Hugging Face Inference API with free models."""
+    models = [
+        "black-forest-labs/FLUX.1-schnell",
+        "stabilityai/stable-diffusion-3.5-large-turbo",
+        "stabilityai/stable-diffusion-3.5-medium",
+        "stabilityai/stable-diffusion-xl-base-1.0",
+    ]
+
+    prompt = f"Professional news photography of {visual_subject}, cinematic, portrait orientation, no text"
+    errors = []
+
+    for model in models:
+        try:
+            resp = httpx.post(
+                f"https://api-inference.huggingface.co/models/{model}",
+                headers={
+                    "Authorization": f"Bearer {config.HUGGINGFACE_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={"inputs": prompt},
+                timeout=30,
+            )
+            if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image/"):
+                _LAST_DEBUG["bg_source"] = f"HuggingFace ({model})"
+                return resp.content
+            errors.append(f"{model}: HTTP {resp.status_code}")
+        except Exception as e:
+            errors.append(f"{model}: {str(e)[:60]}")
+
+    _LAST_DEBUG["hf_errors"] = errors
+    return None
+
+
+def _try_unsplash(visual_subject):
+    """Fetch a photo from Unsplash based on keywords. Always works, no auth needed."""
+    try:
+        # Extract first 2-3 keywords for better search
+        words = visual_subject.split()[:3]
+        keywords = ",".join(words) if words else "news"
+
+        # Lorem Picsum with seed based on subject (consistent for same topic)
+        seed = abs(hash(visual_subject)) % 10000
+        url = f"https://picsum.photos/seed/{seed}/1024/1280"
+
+        resp = httpx.get(url, timeout=10, follow_redirects=True)
+        if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image/"):
+            _LAST_DEBUG["bg_source"] = "Picsum (random photo)"
+            return resp.content
+    except Exception as e:
+        _LAST_DEBUG["unsplash_error"] = str(e)[:80]
     return None
 
 

@@ -39,7 +39,7 @@
         .card{background:#1e2030;border:1px solid #2d3148;border-radius:10px;overflow:hidden;transition:border-color .2s}
         .card:hover{border-color:#667eea}
         .card-img-wrap{position:relative;height:140px;background:#252836;overflow:hidden}
-        .card-img{width:100%;height:140px;object-fit:cover;display:block;opacity:0;transition:opacity .3s}
+        .card-img{width:100%;height:140px;object-fit:cover;display:block;background:#252836}
         .card-img.loaded{opacity:1}
         .img-loading{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#252836}
         .img-actions{position:absolute;top:6px;right:6px;display:flex;gap:4px}
@@ -107,15 +107,14 @@
                 <div class="card">
                     <div class="card-img-wrap">
                         {% if a.image_url %}
-                        <div class="img-loading" id="il{{ a.id }}"><div class="spinner"></div><span style="font-size:10px;color:#8b8fa3;margin-top:6px">Generating (up to 30s)...</span></div>
-                        <img class="card-img" src="{{ a.image_url }}"
-                            onload="this.classList.add('loaded');var el=document.getElementById('il{{ a.id }}');if(el)el.style.display='none'"
-                            onerror="var el=document.getElementById('il{{ a.id }}');if(el)el.innerHTML='<span style=color:#f87171;font-size:11px>⚠️ Failed</span>'">
+                        <img class="card-img loaded" src="{{ a.image_url }}" loading="lazy" decoding="async"
+                            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                        <div class="img-loading" style="display:none"><span style="color:#f87171;font-size:11px">⚠️ Image failed</span></div>
                         {% else %}
                         <div class="img-loading"><span style="color:#5a5f7a;font-size:11px">No image</span></div>
                         {% endif %}
                         <div class="img-actions">
-                            <form action="/regenerate-image/{{ a.id }}" method="post" class="inline"><button class="img-btn">🔄 New Image</button></form>
+                            <form action="/regenerate-image/{{ a.id }}" method="post" class="inline" onsubmit="showLoading()"><button class="img-btn">🔄 New Image</button></form>
                             <form action="/delete/{{ a.id }}" method="post" class="inline"><button class="img-btn" onclick="return confirm('Delete this article?')">🗑️</button></form>
                         </div>
                     </div>
