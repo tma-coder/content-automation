@@ -107,10 +107,10 @@
                 <div class="card">
                     <div class="card-img-wrap">
                         {% if a.image_url %}
-                        <div class="img-loading" id="il{{ a.id }}"><div class="spinner"></div></div>
-                        <img class="card-img" src="{{ a.image_url }}" loading="lazy"
-                            onload="this.classList.add('loaded');document.getElementById('il{{ a.id }}').style.display='none'"
-                            onerror="document.getElementById('il{{ a.id }}').innerHTML='<span style=color:#5a5f7a;font-size:11px>⚠️ Retry with New Image</span>'">
+                        <div class="img-loading" id="il{{ a.id }}"><div class="spinner"></div><span style="font-size:10px;color:#8b8fa3;margin-top:6px">Generating (up to 30s)...</span></div>
+                        <img class="card-img" src="{{ a.image_url }}"
+                            onload="this.classList.add('loaded');var el=document.getElementById('il{{ a.id }}');if(el)el.style.display='none'"
+                            onerror="var el=document.getElementById('il{{ a.id }}');if(el)el.innerHTML='<span style=color:#f87171;font-size:11px>⚠️ Failed</span>'">
                         {% else %}
                         <div class="img-loading"><span style="color:#5a5f7a;font-size:11px">No image</span></div>
                         {% endif %}

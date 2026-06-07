@@ -176,6 +176,48 @@ async def health():
     return {"status": "ok", "templates": os.path.exists(TEMPLATES_DIR), "root": ROOT}
 
 
+@app.get("/test-image")
+async def test_image(title: str = "Latest AI breakthrough in technology"):
+    """Test image generation. Visit /test-image?title=YourTitle"""
+    try:
+        from core.image_generator import generate_image
+        import httpx
+        url = generate_image(title)
+
+        # Test if URL is reachable
+        status = "unknown"
+        try:
+            resp = httpx.head(url, timeout=10, follow_redirects=True)
+            status = f"HTTP {resp.status_code}"
+        except Exception as e:
+            status = f"check failed: {e}"
+
+        # Render HTML page with the image
+        html = f"""
+        <!DOCTYPE html><html><head><title>Image Test</title>
+        <style>body{{background:#0f1117;color:#e1e4e8;font-family:sans-serif;padding:20px}}
+        img{{max-width:800px;border:1px solid #2d3148;border-radius:8px;margin-top:20px}}
+        code{{background:#1e2030;padding:2px 6px;border-radius:4px;font-size:12px}}
+        a{{color:#667eea}}</style></head><body>
+        <h2>Image Generation Test</h2>
+        <p><b>Title:</b> {title}</p>
+        <p><b>URL Status (HEAD check):</b> {status}</p>
+        <p><b>Generated URL:</b><br><code>{url}</code></p>
+        <p><a href="{url}" target="_blank">Open URL directly</a></p>
+        <p>Image preview (may take 10-30s to load on first request):</p>
+        <img src="{url}" onerror="this.style.display='none';document.getElementById('err').style.display='block'">
+        <div id="err" style="display:none;color:#f87171;margin-top:20px">⚠️ Image failed to load</div>
+        <hr style="margin:30px 0;border-color:#2d3148">
+        <p><a href="/test-image?title=Crypto market crashes">Try: Crypto crash</a> |
+        <a href="/test-image?title=SpaceX launches rocket">Try: SpaceX</a> |
+        <a href="/test-image?title=Election news">Try: Election</a></p>
+        </body></html>
+        """
+        return HTMLResponse(html)
+    except Exception as e:
+        return HTMLResponse(f"<pre>Error: {e}\n{traceback.format_exc()}</pre>", status_code=500)
+
+
 @app.get("/diagnose")
 async def diagnose():
     results = {}
