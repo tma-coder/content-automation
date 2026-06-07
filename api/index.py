@@ -181,36 +181,45 @@ async def test_image(title: str = "Latest AI breakthrough in technology"):
     """Test image generation. Visit /test-image?title=YourTitle"""
     try:
         from core.image_generator import generate_image
-        import httpx
-        url = generate_image(title)
+        import time as t
 
-        # Test if URL is reachable
-        status = "unknown"
-        try:
-            resp = httpx.head(url, timeout=10, follow_redirects=True)
-            status = f"HTTP {resp.status_code}"
-        except Exception as e:
-            status = f"check failed: {e}"
+        start = t.time()
+        url = await asyncio.to_thread(generate_image, title)
+        elapsed = t.time() - start
 
-        # Render HTML page with the image
+        # Detect source
+        source = "Unknown"
+        if "supabase.co/storage" in url:
+            source = "✅ Pollinations → Supabase Storage (cached)"
+        elif "picsum" in url:
+            source = "⚠️ Picsum fallback (Pollinations failed)"
+        elif "pollinations" in url:
+            source = "⚠️ Pollinations direct (no auth, may hit rate limit)"
+
         html = f"""
         <!DOCTYPE html><html><head><title>Image Test</title>
-        <style>body{{background:#0f1117;color:#e1e4e8;font-family:sans-serif;padding:20px}}
-        img{{max-width:800px;border:1px solid #2d3148;border-radius:8px;margin-top:20px}}
-        code{{background:#1e2030;padding:2px 6px;border-radius:4px;font-size:12px}}
-        a{{color:#667eea}}</style></head><body>
-        <h2>Image Generation Test</h2>
+        <style>body{{background:#0f1117;color:#e1e4e8;font-family:sans-serif;padding:20px;max-width:900px;margin:0 auto}}
+        img{{max-width:800px;border:1px solid #2d3148;border-radius:8px;margin-top:20px;display:block}}
+        code{{background:#1e2030;padding:8px;border-radius:4px;font-size:12px;display:block;word-break:break-all;margin:8px 0}}
+        a{{color:#667eea}} .info{{background:#1e2030;padding:12px;border-radius:8px;margin:12px 0}}
+        .ok{{color:#34d399}}.warn{{color:#fbbf24}}.err{{color:#f87171}}</style></head><body>
+        <h2>🖼️ Image Generation Test</h2>
+        <div class="info">
         <p><b>Title:</b> {title}</p>
-        <p><b>URL Status (HEAD check):</b> {status}</p>
-        <p><b>Generated URL:</b><br><code>{url}</code></p>
-        <p><a href="{url}" target="_blank">Open URL directly</a></p>
-        <p>Image preview (may take 10-30s to load on first request):</p>
+        <p><b>Source:</b> {source}</p>
+        <p><b>Generation time:</b> {elapsed:.2f}s</p>
+        <p><b>Generated URL:</b><code>{url}</code></p>
+        <p><a href="{url}" target="_blank">→ Open URL directly</a></p>
+        </div>
+        <p>Image preview:</p>
         <img src="{url}" onerror="this.style.display='none';document.getElementById('err').style.display='block'">
-        <div id="err" style="display:none;color:#f87171;margin-top:20px">⚠️ Image failed to load</div>
+        <div id="err" style="display:none;color:#f87171;margin-top:20px">⚠️ Image failed to load in browser</div>
         <hr style="margin:30px 0;border-color:#2d3148">
-        <p><a href="/test-image?title=Crypto market crashes">Try: Crypto crash</a> |
-        <a href="/test-image?title=SpaceX launches rocket">Try: SpaceX</a> |
-        <a href="/test-image?title=Election news">Try: Election</a></p>
+        <p>Quick tests:
+        <a href="/test-image?title=Bitcoin price surges to all time high">Bitcoin</a> |
+        <a href="/test-image?title=SpaceX launches rocket to Mars">SpaceX</a> |
+        <a href="/test-image?title=Election results announced">Election</a> |
+        <a href="/test-image?title=AI breakthrough in medicine">AI Medicine</a></p>
         </body></html>
         """
         return HTMLResponse(html)
