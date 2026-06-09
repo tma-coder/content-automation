@@ -29,6 +29,7 @@ def process_news_item(item, auto_approve=False):
             article.short_text,
             subject=article.subject or "",
             highlight_phrases=article.highlight_phrases or [],
+            people=article.people or [],
         )
     except Exception as e:
         logger.error(f"Image generation failed: {e}")

@@ -40,8 +40,8 @@ def get_debug():
     return _LAST_DEBUG.copy()
 
 
-def generate_image(title, description="", subject="", highlight_phrases=None):
-    """Generate news card."""
+def generate_image(title, description="", subject="", highlight_phrases=None, people=None):
+    """Generate news card. Tries Wikipedia for celebrities first, then AI."""
     global _LAST_DEBUG
     _LAST_DEBUG = {"steps": []}
 
@@ -51,17 +51,28 @@ def generate_image(title, description="", subject="", highlight_phrases=None):
     _LAST_DEBUG["title"] = title
     _LAST_DEBUG["subject"] = subject
     _LAST_DEBUG["highlights"] = highlight_phrases
+    _LAST_DEBUG["people"] = people
 
-    # 1. Background
-    bg_bytes = _generate_background(title, subject)
-    _LAST_DEBUG["bg_size"] = len(bg_bytes) if bg_bytes else 0
-    _LAST_DEBUG["steps"].append(f"bg: {'OK' if bg_bytes else 'FAILED'}")
+    bg_bytes = None
 
+    # 1. Wikipedia for celebrities
+    if people:
+        bg_bytes = _try_wikipedia_people(people)
+        _LAST_DEBUG["steps"].append(f"wikipedia: {'OK' if bg_bytes else 'no match'}")
+
+    # 2. AI generation
+    if not bg_bytes:
+        bg_bytes = _generate_background(title, subject)
+        _LAST_DEBUG["steps"].append(f"ai_bg: {'OK' if bg_bytes else 'FAILED'}")
+
+    # 3. Gradient fallback
     if not bg_bytes:
         bg_bytes = _gradient_background(title)
-        _LAST_DEBUG["steps"].append("bg: using gradient fallback")
+        _LAST_DEBUG["steps"].append("bg: gradient fallback")
 
-    # 2. Compose
+    _LAST_DEBUG["bg_size"] = len(bg_bytes) if bg_bytes else 0
+
+    # 4. Compose
     try:
         final_bytes = _compose_news_card(bg_bytes, title, highlight_phrases or [])
         _LAST_DEBUG["steps"].append(f"compose: OK ({len(final_bytes)} bytes)")
@@ -71,7 +82,7 @@ def generate_image(title, description="", subject="", highlight_phrases=None):
         _LAST_DEBUG["compose_error"] = str(e)
         final_bytes = bg_bytes
 
-    # 3. Upload
+    # 5. Upload
     url = _upload_to_supabase(final_bytes, title)
     _LAST_DEBUG["steps"].append(f"upload: {'OK' if url else 'FAILED'}")
 
@@ -80,8 +91,83 @@ def generate_image(title, description="", subject="", highlight_phrases=None):
     return _svg_placeholder(title)
 
 
-def regenerate_image(title, subject="", highlight_phrases=None):
-    return generate_image(title, subject=subject, highlight_phrases=highlight_phrases)
+def regenerate_image(title, subject="", highlight_phrases=None, people=None):
+    return generate_image(title, subject=subject, highlight_phrases=highlight_phrases, people=people)
+
+
+def _try_wikipedia_people(people):
+    """Fetch real photos of public figures from Wikipedia. Free, no API key."""
+    if not people:
+        return None
+    for name in people:
+        if not name or len(name.strip()) < 3:
+            continue
+        try:
+            img_bytes = _wikipedia_photo(name.strip())
+            if img_bytes:
+                _LAST_DEBUG["bg_source"] = f"Wikipedia: {name}"
+                _LAST_DEBUG["wikipedia_person"] = name
+                return img_bytes
+        except Exception as e:
+            logger.warning(f"Wikipedia '{name}': {e}")
+    return None
+
+
+def _wikipedia_photo(name):
+    """Get main photo for a public figure from Wikipedia."""
+    try:
+        search_resp = httpx.get(
+            "https://en.wikipedia.org/w/api.php",
+            params={
+                "action": "query",
+                "format": "json",
+                "list": "search",
+                "srsearch": name,
+                "srlimit": 3,
+            },
+            headers={"User-Agent": "ContentAutomation/1.0"},
+            timeout=10,
+            follow_redirects=True,
+        )
+        results = search_resp.json().get("query", {}).get("search", [])
+        if not results:
+            return None
+
+        for result in results[:3]:
+            page_title = result.get("title")
+            if not page_title:
+                continue
+            img_resp = httpx.get(
+                "https://en.wikipedia.org/w/api.php",
+                params={
+                    "action": "query",
+                    "format": "json",
+                    "titles": page_title,
+                    "prop": "pageimages",
+                    "piprop": "original|thumbnail",
+                    "pithumbsize": 1280,
+                },
+                headers={"User-Agent": "ContentAutomation/1.0"},
+                timeout=10,
+                follow_redirects=True,
+            )
+            pages = img_resp.json().get("query", {}).get("pages", {})
+            for page in pages.values():
+                original = page.get("original", {})
+                thumb = page.get("thumbnail", {})
+                img_url = original.get("source") or thumb.get("source")
+                if img_url:
+                    logger.info(f"Wikipedia photo for '{name}' -> '{page_title}'")
+                    photo_resp = httpx.get(
+                        img_url, timeout=15, follow_redirects=True,
+                        headers={"User-Agent": "ContentAutomation/1.0"},
+                    )
+                    if photo_resp.status_code == 200 and photo_resp.headers.get("content-type", "").startswith("image/"):
+                        return photo_resp.content
+        return None
+    except Exception as e:
+        logger.error(f"Wikipedia fetch '{name}': {e}")
+        return None
 
 
 def _generate_background(title, subject=""):

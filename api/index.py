@@ -127,9 +127,16 @@ async def regenerate_image_route(article_id: int):
             if after_colon:
                 phrases.append(after_colon)
 
+        # Extract names from title (capitalized 2-word sequences)
+        import re
+        names = re.findall(r'\b([A-Z][a-z]+ [A-Z][a-z]+)\b', title)
+        # Filter common non-person phrases
+        skip = {"United States", "White House", "Wall Street", "New York", "San Francisco", "Los Angeles"}
+        names = [n for n in names if n not in skip]
+
         new_url = await asyncio.to_thread(
             regenerate_image, title,
-            subject="", highlight_phrases=phrases
+            subject="", highlight_phrases=phrases, people=names
         )
         if new_url:
             db.update_image(article_id, new_url)
@@ -193,33 +200,37 @@ async def health():
 
 @app.get("/test-image")
 async def test_image(
-    title: str = "Mufti Speaks at Major Conference",
-    subject: str = "religious scholar at podium with audience",
-    highlights: str = "Mufti Speaks",
+    title: str = "Trump and Sanders agree on AI tax policy",
+    subject: str = "politicians discussing policy",
+    highlights: str = "Trump and Sanders|AI tax",
+    people: str = "Donald Trump|Bernie Sanders",
 ):
-    """Test image generation. /test-image?title=...&subject=...&highlights=phrase1|phrase2"""
+    """Test image generation. /test-image?title=...&subject=...&highlights=p1|p2&people=name1|name2"""
     try:
         from core.image_generator import generate_image
         import time as t
 
         highlight_list = [h.strip() for h in highlights.split("|") if h.strip()]
+        people_list = [p.strip() for p in people.split("|") if p.strip()]
 
         start = t.time()
-        url = await asyncio.to_thread(generate_image, title, "", subject, highlight_list)
+        url = await asyncio.to_thread(generate_image, title, "", subject, highlight_list, people_list)
         elapsed = t.time() - start
 
-        # Detect source
-        source = "Unknown"
-        if "supabase.co/storage" in url and "card_" in url:
-            source = "✅ AI Background + PIL Text Composition → Supabase"
-        elif "supabase.co/storage" in url:
-            source = "✅ OpenRouter → Supabase Storage"
-        elif url.startswith("data:image/svg"):
-            source = "⚠️ SVG placeholder (all generation failed)"
-
-        # Get debug info
+        # Detect source from debug
         from core.image_generator import get_debug
         debug = get_debug()
+        bg_source = debug.get("bg_source", "Unknown")
+
+        if "Wikipedia" in str(bg_source):
+            source = f"✅ {bg_source} → Composited → Supabase"
+        elif "supabase.co/storage" in url and "card_" in url:
+            source = f"✅ {bg_source or 'AI'} → Composited → Supabase"
+        elif url.startswith("data:image/svg"):
+            source = "⚠️ SVG placeholder (all failed)"
+        else:
+            source = "✅ Composited → Supabase"
+
         debug_html = "<br>".join([f"<b>{k}:</b> {v}" for k, v in debug.items()])
 
         html = f"""

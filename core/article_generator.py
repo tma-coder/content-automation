@@ -27,6 +27,7 @@ class GeneratedArticle:
     hashtags: str
     subject: str = ""
     highlight_phrases: list = None
+    people: list = None
 
 
 SYSTEM_PROMPT = """You are a professional social media content writer. Given a news story,
@@ -41,6 +42,7 @@ Format:
     "long_text": "Detailed post (300-500 words). Include analysis and unique perspective.",
     "hashtags": "#tag1 #tag2 #tag3 (5-10 relevant hashtags)",
     "subject": "REQUIRED. A specific, photographable VISUAL subject — physical people, places, objects, or scenes. Be concrete and visual, NOT abstract. Examples: 'humanoid robot working at desk with multiple monitors showing code', 'businessman in suit shaking hands at corporate office', 'bitcoin coins falling on stock chart background', 'astronaut planting flag on Mars surface', 'religious scholar speaking at podium with audience'. NEVER use abstract terms like 'AI era' or 'technology future' — always describe a real photographable scene with concrete subjects.",
+    "people": ["Full names of real public figures, celebrities, politicians, CEOs, athletes, or notable people mentioned. Use their MOST KNOWN full name (e.g., 'Donald Trump' not 'President Trump', 'Elon Musk' not 'Elon'). Empty array [] if no specific person."],
     "highlight_phrases": ["2-3 key phrases from the title to highlight (each 2-6 words)"]
 }
 
@@ -146,6 +148,9 @@ Write original content. Return ONLY valid JSON, nothing else."""
             highlights = data.get("highlight_phrases") or []
             if not isinstance(highlights, list):
                 highlights = []
+            people = data.get("people") or []
+            if not isinstance(people, list):
+                people = []
 
             logger.info(f"Article generated successfully with: {model}")
             return GeneratedArticle(
@@ -155,6 +160,7 @@ Write original content. Return ONLY valid JSON, nothing else."""
                 hashtags=str(hashtags)[:500],
                 subject=str(subject)[:200],
                 highlight_phrases=[str(h)[:80] for h in highlights[:4]],
+                people=[str(p)[:100] for p in people[:4] if str(p).strip()],
             )
 
         except Exception as e:
