@@ -198,6 +198,75 @@ async def health():
     return {"status": "ok", "templates": os.path.exists(TEMPLATES_DIR), "root": ROOT}
 
 
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_policy():
+    """Privacy policy page for Meta App approval."""
+    return HTMLResponse("""
+    <!DOCTYPE html><html><head><title>Privacy Policy</title>
+    <style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:20px;line-height:1.7;color:#222}
+    h1{color:#1a1a2e}h2{margin-top:30px;color:#1a1a2e}</style></head><body>
+    <h1>Privacy Policy</h1>
+    <p><strong>Last updated:</strong> June 2026</p>
+
+    <h2>Overview</h2>
+    <p>Content Automation Bot is a personal automation tool that fetches public news articles and posts them to social media accounts owned by the operator. This service is operated for personal use only.</p>
+
+    <h2>Data We Collect</h2>
+    <ul>
+        <li>Public news articles from Google News RSS feeds</li>
+        <li>AI-generated content based on those articles</li>
+        <li>Posting history and metadata (post IDs, timestamps)</li>
+    </ul>
+    <p>We do NOT collect any personal data from users, visitors, or readers of the social media posts.</p>
+
+    <h2>Data Storage</h2>
+    <p>Article data and generated images are stored in a private Supabase database accessible only to the operator. No third-party access is granted.</p>
+
+    <h2>Third-Party Services</h2>
+    <p>This service interacts with:</p>
+    <ul>
+        <li><strong>Meta Graph API</strong> – to post content to the operator's Facebook Page</li>
+        <li><strong>OpenRouter API</strong> – for AI-generated text content</li>
+        <li><strong>Pollinations.ai / Hugging Face</strong> – for AI-generated images</li>
+        <li><strong>Google News RSS</strong> – for public news article feeds</li>
+    </ul>
+
+    <h2>User Content</h2>
+    <p>All posts created by this service are posted to the operator's own Facebook Page. The operator is solely responsible for the content posted.</p>
+
+    <h2>Data Deletion</h2>
+    <p>To request data deletion, contact the operator directly. All data can be purged from the database at any time.</p>
+
+    <h2>Contact</h2>
+    <p>For privacy concerns related to this automation tool, please contact the operator of the Facebook Page where the content is published.</p>
+
+    <h2>Changes to This Policy</h2>
+    <p>This policy may be updated periodically. The "Last updated" date will reflect changes.</p>
+
+    <p style="margin-top:40px;color:#666;font-size:13px">Content Automation Bot is a personal-use tool. Not affiliated with Meta, Google, or any third-party service mentioned.</p>
+    </body></html>
+    """)
+
+
+@app.get("/data-deletion", response_class=HTMLResponse)
+async def data_deletion():
+    """Data deletion instructions for Meta App approval."""
+    return HTMLResponse("""
+    <!DOCTYPE html><html><head><title>Data Deletion</title>
+    <style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:20px;line-height:1.7}</style>
+    </head><body>
+    <h1>Data Deletion Instructions</h1>
+    <p>To request deletion of any data associated with your interaction with our automated content:</p>
+    <ol>
+        <li>Contact the operator of the Facebook Page directly via Facebook Messenger</li>
+        <li>Include the specific post URL or content you'd like removed</li>
+        <li>Data will be deleted from our systems within 30 days</li>
+    </ol>
+    <p>This service does not collect personal data from end-users. Only public news content and AI-generated posts are stored.</p>
+    </body></html>
+    """)
+
+
 @app.get("/test-image")
 async def test_image(
     title: str = "Trump and Sanders agree on AI tax policy",

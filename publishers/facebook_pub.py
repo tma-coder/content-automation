@@ -10,28 +10,26 @@ GRAPH_API = "https://graph.facebook.com/v21.0"
 class FacebookPublisher:
     def publish(self, title, body, short_text, hashtags, image_url, link):
         if not config.META_PAGE_ACCESS_TOKEN or not config.FACEBOOK_PAGE_ID:
-            return {"success": False, "post_id": "", "error": "Facebook credentials not configured"}
+            return {"success": False, "post_id": "", "error": "Facebook credentials not configured", "post_url": ""}
 
         message = self._build_message(title, body, hashtags, link)
 
         try:
             if image_url:
-                # Try uploading image as binary first (more reliable)
                 result = self._post_with_binary(message, image_url)
                 if result["success"]:
                     return result
-                # Fall back to URL-based upload
-                logger.warning(f"Binary upload failed, trying URL: {result.get('error')}")
+                logger.warning(f"Binary upload failed: {result.get('error')}")
+
                 result = self._post_with_url(message, image_url)
                 if result["success"]:
                     return result
-                # Final fallback to text-only
-                logger.warning(f"URL upload failed, falling back to text: {result.get('error')}")
+                logger.warning(f"URL upload failed: {result.get('error')}")
 
             return self._post_text(message)
         except Exception as e:
             logger.error(f"Facebook publish exception: {e}")
-            return {"success": False, "post_id": "", "error": str(e)}
+            return {"success": False, "post_id": "", "error": str(e), "post_url": ""}
 
     @staticmethod
     def _build_message(title, body, hashtags, link):
@@ -46,34 +44,53 @@ class FacebookPublisher:
             parts.append(f"Source: {link}")
         return "\n\n".join(parts)
 
+    @staticmethod
+    def _make_post_url(post_id):
+        """Build a Facebook URL from the post ID."""
+        if not post_id:
+            return ""
+        # Post IDs come back as "pageid_postid" — Facebook URL format
+        return f"https://www.facebook.com/{post_id}"
+
+    def _result(self, success, post_id="", error=""):
+        return {
+            "success": success,
+            "post_id": post_id,
+            "error": error,
+            "post_url": self._make_post_url(post_id) if success else "",
+        }
+
     def _post_with_binary(self, message, image_url):
         """Download image then upload binary to Facebook (most reliable)."""
         try:
             img_resp = httpx.get(image_url, timeout=45, follow_redirects=True)
             if img_resp.status_code != 200 or not img_resp.content:
-                return {"success": False, "post_id": "", "error": f"Image fetch failed: HTTP {img_resp.status_code}"}
+                return self._result(False, error=f"Image fetch failed: HTTP {img_resp.status_code}")
 
-            # Verify it's actually an image
             content_type = img_resp.headers.get("content-type", "image/png")
             if not content_type.startswith("image/"):
-                return {"success": False, "post_id": "", "error": f"Not an image: {content_type}"}
+                return self._result(False, error=f"Not an image: {content_type}")
 
             resp = httpx.post(
                 f"{GRAPH_API}/{config.FACEBOOK_PAGE_ID}/photos",
                 data={
                     "message": message,
                     "access_token": config.META_PAGE_ACCESS_TOKEN,
+                    "published": "true",  # Explicitly publish (default but be explicit)
                 },
                 files={"source": ("image.png", img_resp.content, content_type)},
                 timeout=60,
             )
             data = resp.json()
             if "id" in data:
-                return {"success": True, "post_id": data["id"], "error": ""}
+                # For photo posts, also get the actual post_id (page_id_postid format)
+                post_id = data.get("post_id") or data.get("id")
+                logger.info(f"FB photo posted: id={data.get('id')}, post_id={data.get('post_id')}")
+                return self._result(True, post_id=post_id)
             err = data.get("error", {}).get("message", str(data))
-            return {"success": False, "post_id": "", "error": err}
+            return self._result(False, error=err)
         except Exception as e:
-            return {"success": False, "post_id": "", "error": f"Binary upload error: {e}"}
+            return self._result(False, error=f"Binary upload error: {e}")
 
     def _post_with_url(self, message, image_url):
         """Pass URL to Facebook - Facebook will fetch it."""
@@ -84,16 +101,18 @@ class FacebookPublisher:
                     "message": message,
                     "url": image_url,
                     "access_token": config.META_PAGE_ACCESS_TOKEN,
+                    "published": "true",
                 },
                 timeout=60,
             )
             data = resp.json()
             if "id" in data:
-                return {"success": True, "post_id": data["id"], "error": ""}
+                post_id = data.get("post_id") or data.get("id")
+                return self._result(True, post_id=post_id)
             err = data.get("error", {}).get("message", str(data))
-            return {"success": False, "post_id": "", "error": err}
+            return self._result(False, error=err)
         except Exception as e:
-            return {"success": False, "post_id": "", "error": f"URL upload error: {e}"}
+            return self._result(False, error=f"URL upload error: {e}")
 
     def _post_text(self, message):
         """Text-only post fallback."""
@@ -103,13 +122,14 @@ class FacebookPublisher:
                 data={
                     "message": message,
                     "access_token": config.META_PAGE_ACCESS_TOKEN,
+                    "published": "true",
                 },
                 timeout=30,
             )
             data = resp.json()
             if "id" in data:
-                return {"success": True, "post_id": data["id"], "error": ""}
+                return self._result(True, post_id=data["id"])
             err = data.get("error", {}).get("message", str(data))
-            return {"success": False, "post_id": "", "error": err}
+            return self._result(False, error=err)
         except Exception as e:
-            return {"success": False, "post_id": "", "error": f"Text post error: {e}"}
+            return self._result(False, error=f"Text post error: {e}")
