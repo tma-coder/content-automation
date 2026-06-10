@@ -1,100 +1,154 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ article.generated_title }}</title>
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#e1e4e8;min-height:100vh}
-        .header{background:linear-gradient(135deg,#1a1d29,#252836);border-bottom:1px solid #2d3148;padding:16px 30px;display:flex;justify-content:space-between;align-items:center}
-        a{color:#667eea;text-decoration:none}a:hover{text-decoration:underline}
-        .btn{padding:8px 16px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
-        .btn-success{background:#059669;color:#fff}
-        .btn-danger{background:#dc2626;color:#fff}
-        .btn-ghost{background:transparent;border:1px solid #2d3148;color:#8b8fa3}
-        .container{max-width:800px;margin:0 auto;padding:30px 20px}
-        .img-wrap{position:relative;margin-bottom:20px;border-radius:10px;overflow:hidden;background:#252836;display:flex;justify-content:center}
-        .article-img{width:100%;max-width:600px;height:auto;display:block;opacity:0;transition:opacity .3s}
-        .article-img.loaded{opacity:1}
-        .img-loading{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-        .spinner{width:24px;height:24px;border:3px solid #2d3148;border-top:3px solid #667eea;border-radius:50%;animation:spin .8s linear infinite}
-        @keyframes spin{to{transform:rotate(360deg)}}
-        .img-actions{position:absolute;top:8px;right:8px}
-        .img-btn{background:rgba(0,0,0,.7);color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer}
-        .title{font-size:24px;font-weight:700;margin-bottom:12px;line-height:1.3}
-        .meta{color:#8b8fa3;font-size:12px;margin-bottom:20px;line-height:1.8}
-        .label{font-size:11px;color:#667eea;text-transform:uppercase;letter-spacing:1px;margin:24px 0 6px;font-weight:600}
-        .content{background:#1e2030;border:1px solid #2d3148;border-radius:8px;padding:16px;font-size:13px;line-height:1.8;white-space:pre-wrap;margin-bottom:12px}
-        .tags{color:#667eea;font-size:13px;margin-bottom:20px}
-        .actions{display:flex;gap:10px;margin-top:24px;flex-wrap:wrap}
-        .status{padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600}
-        .s-pending{background:#78350f;color:#fbbf24}
-        .s-posted{background:#064e3b;color:#34d399}
-        .s-rejected{background:#1e1e1e;color:#8b8fa3}
-        .s-failed{background:#7f1d1d;color:#f87171}
-        form.inline{display:inline}
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ article.generated_title }} · Content Automation</title>
+<style>
+:root{
+    --bg:#0a0d14; --surface:#11151f; --surface-2:#161b27; --surface-3:#1c2230;
+    --border:#252b3d; --border-strong:#363d52;
+    --primary:#6366f1; --primary-2:#8b5cf6; --primary-glow:rgba(99,102,241,.4);
+    --success:#10b981; --warning:#f59e0b; --danger:#ef4444; --info:#3b82f6;
+    --text:#e5e7eb; --text-2:#9ca3af; --text-3:#6b7280;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:14px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--primary);text-decoration:none}
+a:hover{color:var(--primary-2)}
+.nav{position:sticky;top:0;background:rgba(10,13,20,.85);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);z-index:50;padding:14px 32px;display:flex;justify-content:space-between;align-items:center}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;color:var(--text)}
+.brand-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--primary),var(--primary-2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff}
+
+.btn{padding:9px 16px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:inherit;line-height:1}
+.btn:hover{transform:translateY(-1px)}
+.btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-2));color:#fff;box-shadow:0 4px 12px var(--primary-glow)}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text-2)}
+.btn-ghost:hover{background:var(--surface);color:var(--text);border-color:var(--primary)}
+.btn-sm{padding:6px 12px;font-size:12px}
+
+.container{max-width:820px;margin:0 auto;padding:28px 24px 60px}
+
+.back-link{display:inline-flex;align-items:center;gap:6px;color:var(--text-2);font-size:13px;margin-bottom:18px;padding:6px 12px;border-radius:6px;transition:background .15s}
+.back-link:hover{background:var(--surface);color:var(--text)}
+
+.status-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.status{padding:4px 12px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+.s-pending{background:rgba(245,158,11,.15);color:var(--warning)}
+.s-posted{background:rgba(16,185,129,.15);color:var(--success)}
+.s-rejected{background:var(--surface-2);color:var(--text-3)}
+.s-failed{background:rgba(239,68,68,.15);color:var(--danger)}
+.s-approved{background:rgba(16,185,129,.15);color:var(--success)}
+
+.img-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:24px;position:relative;display:flex;justify-content:center;overflow:hidden}
+.article-img{max-width:100%;width:auto;height:auto;max-height:680px;border-radius:8px;display:block}
+.img-regen{position:absolute;top:24px;right:24px}
+
+h1.title{font-size:26px;font-weight:700;line-height:1.3;margin-bottom:14px;color:var(--text)}
+
+.meta-row{display:flex;flex-wrap:wrap;gap:14px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:24px;font-size:12px;color:var(--text-2)}
+.meta-row span{display:inline-flex;align-items:center;gap:6px}
+.meta-row strong{color:var(--text);font-weight:600}
+
+.label{font-size:11px;color:var(--primary);text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin:24px 0 8px}
+.content{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;font-size:14px;line-height:1.7;white-space:pre-wrap;color:var(--text)}
+.tags{color:var(--primary);font-size:13px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;word-break:break-word}
+
+.publish-section{margin-top:32px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px}
+.publish-section h2{font-size:16px;font-weight:600;margin-bottom:6px;color:var(--text)}
+.publish-section .sub{font-size:12px;color:var(--text-2);margin-bottom:16px}
+.page-option{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;cursor:pointer;transition:all .15s}
+.page-option:hover{border-color:var(--primary)}
+.page-option input{margin:0}
+.page-name{font-weight:600;color:var(--text);font-size:13px}
+.page-id{font-size:11px;color:var(--text-3);font-family:monospace}
+
+.actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+
+.no-pages{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:12px 14px;color:var(--warning);font-size:13px;margin-bottom:14px}
+
+form.inline{display:inline}
+</style>
 </head>
 <body>
-    <div class="header">
-        <a href="/" style="font-size:14px">← Dashboard</a>
+
+<nav class="nav">
+    <a href="/" class="brand">
+        <span class="brand-icon">CA</span>
+        <span>Content Automation</span>
+    </a>
+    <a href="/logout" class="btn btn-ghost btn-sm">Sign out</a>
+</nav>
+
+<div class="container">
+
+    <a href="/" class="back-link">← Back to Dashboard</a>
+
+    <div class="status-row">
         <span class="status s-{{ article.status }}">{{ article.status }}</span>
     </div>
-    <div class="container">
-        {% if article.image_url %}
-        <div class="img-wrap">
-            <div class="img-loading" id="imgload"><div class="spinner"></div></div>
-            <img class="article-img" src="{{ article.image_url }}" loading="lazy"
-                onload="this.classList.add('loaded');document.getElementById('imgload').style.display='none'"
-                onerror="document.getElementById('imgload').innerHTML='<span style=color:#5a5f7a>⚠️ Image unavailable</span>'">
-            <div class="img-actions">
-                <form action="/regenerate-image/{{ article.id }}" method="post" class="inline"><button class="img-btn">🔄 New Image</button></form>
-            </div>
-        </div>
-        {% endif %}
 
-        <div class="title">{{ article.generated_title }}</div>
-        <div class="meta">
-            📰 Source: <a href="{{ article.source_url }}" target="_blank">{{ article.source_title }}</a><br>
-            {% if article.published_at %}📅 Published: {{ article.published_at }}<br>{% endif %}
-            ⏰ Fetched: {{ article.created_at[:19] }}
-        </div>
+    {% if article.image_url %}
+    <div class="img-card">
+        <img class="article-img" src="{{ article.image_url }}">
+        <form action="/regenerate-image/{{ article.id }}" method="post" class="inline img-regen">
+            <button class="btn btn-ghost btn-sm">🔄 Regenerate Image</button>
+        </form>
+    </div>
+    {% endif %}
 
-        <div class="label">Short Version (Instagram/Twitter)</div>
-        <div class="content">{{ article.short_text }}</div>
+    <h1 class="title">{{ article.generated_title }}</h1>
 
-        <div class="label">Full Article (Facebook/Blog)</div>
-        <div class="content">{{ article.long_text }}</div>
+    <div class="meta-row">
+        <span>📰 <strong><a href="{{ article.source_url }}" target="_blank">{{ article.source_title }}</a></strong></span>
+        {% if article.published_at %}<span>📅 Published: <strong>{{ article.published_at[:19] }}</strong></span>{% endif %}
+        <span>⏰ Fetched: <strong>{{ article.created_at[:19] }}</strong></span>
+    </div>
 
-        <div class="label">Hashtags</div>
-        <div class="tags">{{ article.hashtags }}</div>
+    <div class="label">📱 Short Version (Instagram / Twitter)</div>
+    <div class="content">{{ article.short_text }}</div>
 
-        {% if article.status == 'pending' %}
-        <div class="label">Post to which pages?</div>
+    <div class="label">📄 Full Article (Facebook / Blog)</div>
+    <div class="content">{{ article.long_text }}</div>
+
+    <div class="label"># Hashtags</div>
+    <div class="tags">{{ article.hashtags }}</div>
+
+    {% if article.status == 'pending' %}
+    <div class="publish-section">
+        <h2>📘 Publish to Facebook</h2>
+        <p class="sub">Select which connected pages this article should be posted to.</p>
+
+        {% if pages %}
         <form action="/approve/{{ article.id }}" method="post" id="approveForm">
-            {% if pages %}
-            <div style="background:#1e2030;border:1px solid #2d3148;border-radius:8px;padding:14px">
-                {% for p in pages %}
-                <label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;cursor:pointer">
-                    <input type="checkbox" name="page_ids" value="{{ p.id }}" checked>
-                    <strong>{{ p.page_name }}</strong>
-                    <code style="color:#8b8fa3;font-size:11px">{{ p.page_id }}</code>
-                </label>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p style="color:#f87171;font-size:12px">⚠️ No pages configured. <a href="/pages">Add a page →</a></p>
-            {% endif %}
+            {% for p in pages %}
+            <label class="page-option">
+                <input type="checkbox" name="page_ids" value="{{ p.id }}" checked>
+                <div style="flex:1">
+                    <div class="page-name">{{ p.page_name }}</div>
+                    <div class="page-id">ID: {{ p.page_id }}</div>
+                </div>
+            </label>
+            {% endfor %}
+
             <div class="actions">
-                <button type="submit" class="btn btn-success">✅ Approve & Post</button>
-                <a href="/reject-action" class="btn btn-danger" onclick="document.getElementById('rejectForm').submit();return false">✖ Reject</a>
-                <a href="/delete-action" class="btn btn-ghost" onclick="if(confirm('Delete?'))document.getElementById('deleteForm').submit();return false">🗑️ Delete</a>
+                <button type="submit" class="btn btn-success">✓ Approve & Post</button>
+                <button type="button" class="btn btn-danger" onclick="document.getElementById('rejectForm').submit()">✕ Reject</button>
+                <button type="button" class="btn btn-ghost" onclick="if(confirm('Delete this article permanently?'))document.getElementById('deleteForm').submit()">🗑️ Delete</button>
             </div>
         </form>
         <form action="/reject/{{ article.id }}" method="post" id="rejectForm" style="display:none"></form>
         <form action="/delete/{{ article.id }}" method="post" id="deleteForm" style="display:none"></form>
+        {% else %}
+        <div class="no-pages">⚠️ No Facebook pages configured. Ask an admin to <a href="/pages" style="color:var(--warning);text-decoration:underline">connect a page</a> before approving.</div>
         {% endif %}
     </div>
+    {% endif %}
+
+</div>
+
 </body>
 </html>
