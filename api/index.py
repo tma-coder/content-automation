@@ -49,13 +49,14 @@ SESSION_COOKIE = "ca_session"
 SESSION_MAX_AGE = 7 * 24 * 3600  # 7 days
 
 def _get_users():
-    """Parse DASHBOARD_USERS env: 'user1:pass1,user2:pass2'."""
+    """Parse DASHBOARD_USERS env: 'email1@x.com:pass1,email2@x.com:pass2'.
+    Email is case-insensitive."""
     import config
     users = {}
     for entry in config.DASHBOARD_USERS.split(","):
         if ":" in entry:
             u, p = entry.split(":", 1)
-            users[u.strip()] = p.strip()
+            users[u.strip().lower()] = p.strip()
     return users
 
 
@@ -106,40 +107,55 @@ def require_auth(ca_session: str = Cookie(None)):
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(error: str = ""):
     return HTMLResponse(f"""
-    <!DOCTYPE html><html><head><title>Login - Content Automation</title>
+    <!DOCTYPE html><html><head><title>Sign In - Content Automation</title>
     <style>
     *{{margin:0;padding:0;box-sizing:border-box}}
     body{{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#e1e4e8;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}}
-    .card{{background:#1e2030;border:1px solid #2d3148;border-radius:14px;padding:36px;width:100%;max-width:380px}}
-    h1{{font-size:24px;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px;text-align:center}}
-    .sub{{color:#8b8fa3;font-size:13px;text-align:center;margin-bottom:24px}}
-    label{{font-size:12px;color:#8b8fa3;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px;margin-top:14px}}
-    input{{width:100%;background:#0f1117;border:1px solid #2d3148;color:#e1e4e8;padding:11px 14px;border-radius:8px;font-size:14px}}
+    .card{{background:#1e2030;border:1px solid #2d3148;border-radius:14px;padding:36px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.4)}}
+    .logo{{width:48px;height:48px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:12px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:bold;color:#fff}}
+    h1{{font-size:22px;background:linear-gradient(135deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px;text-align:center;font-weight:700}}
+    .sub{{color:#8b8fa3;font-size:13px;text-align:center;margin-bottom:28px}}
+    label{{font-size:11px;color:#8b8fa3;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px;margin-top:16px;font-weight:600}}
+    .input-wrap{{position:relative}}
+    .input-icon{{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#5a5f7a;font-size:14px;pointer-events:none}}
+    input{{width:100%;background:#0f1117;border:1px solid #2d3148;color:#e1e4e8;padding:12px 14px 12px 40px;border-radius:8px;font-size:14px;transition:border-color .15s}}
     input:focus{{outline:none;border-color:#667eea}}
-    button{{width:100%;margin-top:24px;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}}
-    button:hover{{opacity:.9}}
-    .err{{background:#7f1d1d;color:#fecaca;padding:10px 12px;border-radius:6px;font-size:12px;margin-top:14px}}
+    input::placeholder{{color:#5a5f7a}}
+    button{{width:100%;margin-top:24px;padding:13px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}}
+    button:hover{{opacity:.9;transform:translateY(-1px)}}
+    .err{{background:#7f1d1d;color:#fecaca;padding:10px 14px;border-radius:6px;font-size:12px;margin-top:16px;display:flex;align-items:center;gap:8px}}
+    .footer{{text-align:center;color:#5a5f7a;font-size:11px;margin-top:24px}}
     </style></head><body>
     <div class="card">
+    <div class="logo">CA</div>
     <h1>Content Automation</h1>
-    <div class="sub">Sign in to continue</div>
+    <div class="sub">Sign in with your email to continue</div>
     <form method="post" action="/login">
-    <label>Username</label>
-    <input name="username" required autofocus>
+    <label>Email address</label>
+    <div class="input-wrap">
+        <span class="input-icon">✉️</span>
+        <input name="email" type="email" required autofocus placeholder="you@example.com" autocomplete="email">
+    </div>
     <label>Password</label>
-    <input name="password" type="password" required>
-    {"<div class='err'>Invalid credentials</div>" if error else ""}
-    <button type="submit">Sign In</button>
+    <div class="input-wrap">
+        <span class="input-icon">🔒</span>
+        <input name="password" type="password" required placeholder="••••••••" autocomplete="current-password">
+    </div>
+    {"<div class='err'>⚠️ Invalid email or password</div>" if error else ""}
+    <button type="submit">Sign In →</button>
     </form>
+    <div class="footer">Secured by HMAC sessions · 7-day persistence</div>
     </div></body></html>
     """)
 
 
 @app.post("/login")
-async def login_submit(username: str = Form(...), password: str = Form(...)):
+async def login_submit(email: str = Form(...), password: str = Form(...)):
     users = _get_users()
-    if users.get(username) == password:
-        token = _make_session(username)
+    # Normalize email (case-insensitive)
+    email_lower = email.strip().lower()
+    if users.get(email_lower) == password:
+        token = _make_session(email_lower)
         resp = RedirectResponse(url="/", status_code=303)
         resp.set_cookie(SESSION_COOKIE, token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
         return resp
