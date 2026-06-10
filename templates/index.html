@@ -73,7 +73,11 @@
     <div class="loading" id="loading"><div class="spinner" style="width:36px;height:36px"></div><p>Working...</p></div>
     <div class="header">
         <h1>Content Automation</h1>
-        <span class="badge {{ 'badge-auto' if mode == 'AUTO' else 'badge-manual' }}">{{ mode }}</span>
+        <div style="display:flex;gap:10px;align-items:center">
+            <span class="badge {{ 'badge-auto' if mode == 'AUTO' else 'badge-manual' }}">{{ mode }}</span>
+            <a href="/pages" class="btn btn-ghost btn-sm">📘 Pages</a>
+            <a href="/logout" class="btn btn-ghost btn-sm" title="Logout {{ user }}">🚪 {{ user }}</a>
+        </div>
     </div>
     <div class="fetch-bar">
         <form action="/trigger" method="post" style="display:flex;gap:8px;flex:1;flex-wrap:wrap;align-items:center" onsubmit="showLoading()">
@@ -127,7 +131,12 @@
                             {% if a.published_at %}📅 {{ a.published_at }}{% endif %}
                         </div>
                         <div class="card-actions">
-                            <form action="/approve/{{ a.id }}" method="post" class="inline" onsubmit="showLoading()"><button class="btn btn-success btn-sm">✅ Post</button></form>
+                            <form action="/approve/{{ a.id }}" method="post" class="inline" onsubmit="return confirmPages(this,{{ a.id }})">
+                                {% for p in pages %}
+                                <input type="hidden" name="page_ids" value="{{ p.id }}" class="page-check-{{ a.id }}">
+                                {% endfor %}
+                                <button type="submit" class="btn btn-success btn-sm">✅ Post {% if pages|length > 1 %}to {{ pages|length }} pages{% endif %}</button>
+                            </form>
                             <form action="/reject/{{ a.id }}" method="post" class="inline"><button class="btn btn-danger btn-sm">✖ Reject</button></form>
                             <a href="/article/{{ a.id }}" class="btn btn-ghost btn-sm">View</a>
                         </div>

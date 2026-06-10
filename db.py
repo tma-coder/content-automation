@@ -125,6 +125,66 @@ def get_post_history(limit=20):
     return res.data
 
 
+# =================
+# Facebook Pages
+# =================
+
+def get_facebook_pages(enabled_only=False):
+    """Get all configured Facebook pages."""
+    try:
+        query = get_client().table("facebook_pages").select("*").order("page_name")
+        if enabled_only:
+            query = query.eq("enabled", True)
+        res = query.execute()
+        pages = res.data or []
+
+        # If no pages in DB, fall back to env vars (single page legacy)
+        if not pages:
+            import config
+            if config.FACEBOOK_PAGE_ID and config.META_PAGE_ACCESS_TOKEN:
+                return [{
+                    "id": 0,
+                    "page_id": config.FACEBOOK_PAGE_ID,
+                    "page_name": "Default Page",
+                    "access_token": config.META_PAGE_ACCESS_TOKEN,
+                    "enabled": True,
+                }]
+        return pages
+    except Exception as e:
+        logger.warning(f"get_facebook_pages: {e}")
+        # Fall back to env
+        import config
+        if config.FACEBOOK_PAGE_ID and config.META_PAGE_ACCESS_TOKEN:
+            return [{
+                "id": 0,
+                "page_id": config.FACEBOOK_PAGE_ID,
+                "page_name": "Default Page",
+                "access_token": config.META_PAGE_ACCESS_TOKEN,
+                "enabled": True,
+            }]
+        return []
+
+
+def add_facebook_page(page_id, page_name, access_token):
+    get_client().table("facebook_pages").insert({
+        "page_id": page_id,
+        "page_name": page_name,
+        "access_token": access_token,
+        "enabled": True,
+    }).execute()
+
+
+def delete_facebook_page(row_id):
+    get_client().table("facebook_pages").delete().eq("id", row_id).execute()
+
+
+def toggle_facebook_page(row_id):
+    page = get_client().table("facebook_pages").select("enabled").eq("id", row_id).execute()
+    if page.data:
+        current = page.data[0].get("enabled", True)
+        get_client().table("facebook_pages").update({"enabled": not current}).eq("id", row_id).execute()
+
+
 def get_daily_post_count(platform):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:

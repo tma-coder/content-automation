@@ -67,19 +67,32 @@ def process_news_item(item, auto_approve=False):
     return article_id
 
 
-def publish_article(article_id):
-    """Publish an article to all enabled platforms."""
+def publish_article(article_id, page_ids=None):
+    """Publish an article to selected Facebook pages.
+    page_ids: list of page DB ids to post to. If None, posts to all enabled pages.
+    """
     article = db.get_article(article_id)
     if not article:
         logger.error(f"Article #{article_id} not found")
         return {}
 
-    results = {}
+    pages = db.get_facebook_pages(enabled_only=True)
+    if page_ids:
+        pages = [p for p in pages if str(p.get("id")) in [str(pid) for pid in page_ids]]
 
-    # Facebook
-    if config.META_PAGE_ACCESS_TOKEN and config.FACEBOOK_PAGE_ID:
-        fb = FacebookPublisher()
+    if not pages:
+        logger.warning(f"No Facebook pages configured for article #{article_id}")
+        db.update_article_status(article_id, "failed")
+        return {}
+
+    results = {}
+    for page in pages:
+        platform_label = f"facebook:{page.get('page_name', 'page')}"
         try:
+            fb = FacebookPublisher(
+                page_id=page["page_id"],
+                access_token=page["access_token"],
+            )
             result = fb.publish(
                 title=article["generated_title"],
                 body=article["long_text"],
@@ -90,25 +103,24 @@ def publish_article(article_id):
             )
             db.log_post(
                 article_id,
-                "facebook",
+                platform_label,
                 result["success"],
                 post_id=result.get("post_id", ""),
                 error_message=result.get("error", ""),
             )
-            results["facebook"] = result["success"]
+            results[platform_label] = result["success"]
             if result["success"]:
-                logger.info(f"Posted to Facebook: {result.get('post_id', '')}")
+                logger.info(f"Posted to {platform_label}: {result.get('post_id', '')}")
             else:
-                logger.error(f"Facebook failed: {result.get('error', '')}")
+                logger.error(f"{platform_label} failed: {result.get('error', '')}")
         except Exception as e:
-            logger.exception(f"Facebook exception for #{article_id}")
+            logger.exception(f"{platform_label} exception for #{article_id}")
             try:
-                db.log_post(article_id, "facebook", False, error_message=str(e))
+                db.log_post(article_id, platform_label, False, error_message=str(e))
             except Exception:
                 pass
-            results["facebook"] = False
+            results[platform_label] = False
 
-    # Update status
     new_status = "posted" if any(results.values()) else "failed"
     try:
         db.update_article_status(article_id, new_status)

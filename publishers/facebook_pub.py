@@ -8,8 +8,13 @@ GRAPH_API = "https://graph.facebook.com/v21.0"
 
 
 class FacebookPublisher:
+    def __init__(self, page_id=None, access_token=None):
+        # Allow per-page credentials, fall back to env defaults
+        self.page_id = page_id or self.page_id
+        self.access_token = access_token or self.access_token
+
     def publish(self, title, body, short_text, hashtags, image_url, link):
-        if not config.META_PAGE_ACCESS_TOKEN or not config.FACEBOOK_PAGE_ID:
+        if not self.access_token or not self.page_id:
             return {"success": False, "post_id": "", "error": "Facebook credentials not configured", "post_url": ""}
 
         message = self._build_message(title, body, hashtags, link)
@@ -72,10 +77,10 @@ class FacebookPublisher:
                 return self._result(False, error=f"Not an image: {content_type}")
 
             resp = httpx.post(
-                f"{GRAPH_API}/{config.FACEBOOK_PAGE_ID}/photos",
+                f"{GRAPH_API}/{self.page_id}/photos",
                 data={
                     "message": message,
-                    "access_token": config.META_PAGE_ACCESS_TOKEN,
+                    "access_token": self.access_token,
                     "published": "true",  # Explicitly publish (default but be explicit)
                 },
                 files={"source": ("image.png", img_resp.content, content_type)},
@@ -96,11 +101,11 @@ class FacebookPublisher:
         """Pass URL to Facebook - Facebook will fetch it."""
         try:
             resp = httpx.post(
-                f"{GRAPH_API}/{config.FACEBOOK_PAGE_ID}/photos",
+                f"{GRAPH_API}/{self.page_id}/photos",
                 data={
                     "message": message,
                     "url": image_url,
-                    "access_token": config.META_PAGE_ACCESS_TOKEN,
+                    "access_token": self.access_token,
                     "published": "true",
                 },
                 timeout=60,
@@ -118,10 +123,10 @@ class FacebookPublisher:
         """Text-only post fallback."""
         try:
             resp = httpx.post(
-                f"{GRAPH_API}/{config.FACEBOOK_PAGE_ID}/feed",
+                f"{GRAPH_API}/{self.page_id}/feed",
                 data={
                     "message": message,
-                    "access_token": config.META_PAGE_ACCESS_TOKEN,
+                    "access_token": self.access_token,
                     "published": "true",
                 },
                 timeout=30,

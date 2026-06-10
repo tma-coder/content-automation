@@ -14,8 +14,8 @@
         .btn-danger{background:#dc2626;color:#fff}
         .btn-ghost{background:transparent;border:1px solid #2d3148;color:#8b8fa3}
         .container{max-width:800px;margin:0 auto;padding:30px 20px}
-        .img-wrap{position:relative;margin-bottom:20px;border-radius:10px;overflow:hidden;background:#252836;min-height:200px}
-        .article-img{width:100%;max-height:400px;object-fit:cover;display:block;opacity:0;transition:opacity .3s}
+        .img-wrap{position:relative;margin-bottom:20px;border-radius:10px;overflow:hidden;background:#252836;display:flex;justify-content:center}
+        .article-img{width:100%;max-width:600px;height:auto;display:block;opacity:0;transition:opacity .3s}
         .article-img.loaded{opacity:1}
         .img-loading{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
         .spinner{width:24px;height:24px;border:3px solid #2d3148;border-top:3px solid #667eea;border-radius:50%;animation:spin .8s linear infinite}
@@ -71,11 +71,29 @@
         <div class="tags">{{ article.hashtags }}</div>
 
         {% if article.status == 'pending' %}
-        <div class="actions">
-            <form action="/approve/{{ article.id }}" method="post" class="inline"><button class="btn btn-success">✅ Approve & Post</button></form>
-            <form action="/reject/{{ article.id }}" method="post" class="inline"><button class="btn btn-danger">✖ Reject</button></form>
-            <form action="/delete/{{ article.id }}" method="post" class="inline"><button class="btn btn-ghost" onclick="return confirm('Delete?')">🗑️ Delete</button></form>
-        </div>
+        <div class="label">Post to which pages?</div>
+        <form action="/approve/{{ article.id }}" method="post" id="approveForm">
+            {% if pages %}
+            <div style="background:#1e2030;border:1px solid #2d3148;border-radius:8px;padding:14px">
+                {% for p in pages %}
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;cursor:pointer">
+                    <input type="checkbox" name="page_ids" value="{{ p.id }}" checked>
+                    <strong>{{ p.page_name }}</strong>
+                    <code style="color:#8b8fa3;font-size:11px">{{ p.page_id }}</code>
+                </label>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="color:#f87171;font-size:12px">⚠️ No pages configured. <a href="/pages">Add a page →</a></p>
+            {% endif %}
+            <div class="actions">
+                <button type="submit" class="btn btn-success">✅ Approve & Post</button>
+                <a href="/reject-action" class="btn btn-danger" onclick="document.getElementById('rejectForm').submit();return false">✖ Reject</a>
+                <a href="/delete-action" class="btn btn-ghost" onclick="if(confirm('Delete?'))document.getElementById('deleteForm').submit();return false">🗑️ Delete</a>
+            </div>
+        </form>
+        <form action="/reject/{{ article.id }}" method="post" id="rejectForm" style="display:none"></form>
+        <form action="/delete/{{ article.id }}" method="post" id="deleteForm" style="display:none"></form>
         {% endif %}
     </div>
 </body>
